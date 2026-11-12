@@ -21,15 +21,19 @@
     var idx = torneio.currentLevelIndex;
     var restante = calcularRestante(estado);
 
+    // Só a aba que está mostrando a tela Timer toca o alarme — senão, cada aba aberta
+    // (Admin, Gerente, abas esquecidas) tocaria o mesmo aviso de forma independente e fora de sincronia.
+    var exibindoTimer = window.ROTA_ATUAL === "timer";
+
     if (ultimoNivelVisto !== idx) {
-      if (ultimoNivelVisto !== null) Audio30.bipar(torneio.muted);
+      if (ultimoNivelVisto !== null && exibindoTimer) Audio30.bipar(torneio.muted);
       ultimoNivelVisto = idx;
       alerta30Disparado = false;
     }
 
     if (!alerta30Disparado && restante <= 30 && restante > 0 && torneio.status === "running") {
       alerta30Disparado = true;
-      Audio30.alertaCurto(torneio.muted);
+      if (exibindoTimer) Audio30.alertaCurto(torneio.muted);
     }
 
     if (restante <= 0 && torneio.status === "running" && !avancando) {

@@ -240,6 +240,9 @@
     else document.getElementById("tela-menu").classList.add("ativa");
     if (alvo === "historico") carregarHistorico();
     if (alvo === "gerente" || alvo === "admin") atualizarListaTorneios();
+    // O alarme sonoro só deve tocar na tela que está de fato visível para quem joga —
+    // sem isso, toda aba aberta (Admin, Gerente, abas esquecidas) tocaria junto e fora de sincronia.
+    window.ROTA_ATUAL = alvo;
   }
 
   window.addEventListener("hashchange", function () {
