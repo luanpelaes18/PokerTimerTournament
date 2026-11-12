@@ -107,6 +107,13 @@ def _elapsed_seconds(row, agora: datetime) -> float:
     return elapsed
 
 
+def _entradas_fechadas(levels: list, current_level_index: int) -> bool:
+    indices_fechamento = [i for i, nivel in enumerate(levels) if nivel.get("closesEntries")]
+    if not indices_fechamento:
+        return False
+    return current_level_index >= min(indices_fechamento)
+
+
 def montar_snapshot(con) -> dict:
     row = _torneio_atual_row(con)
     participantes = con.execute(
@@ -159,14 +166,16 @@ def montar_snapshot(con) -> dict:
     prize_pool = total_actions * (action_price - dealer_share)
     dealer_total = total_actions * dealer_share
     avg_stack = (total_chips / active_count) if active_count > 0 else 0
+    levels = json.loads(row["levels_json"])
 
     return {
         "tournament": {
             "id": row["id"],
             "name": row["name"],
             "status": row["status"],
-            "levels": json.loads(row["levels_json"]),
+            "levels": levels,
             "currentLevelIndex": row["current_level_index"],
+            "entriesClosed": _entradas_fechadas(levels, row["current_level_index"]),
             "elapsedSeconds": elapsed,
             "muted": bool(row["muted"]),
             "entryValue": entry_value,
@@ -255,6 +264,10 @@ async def registrar_reentrada(participant_id: str):
     # marcado como eliminado (reentrada tardia) — por isso também reativa.
     con = db.conectar()
     try:
+        torneio = _torneio_atual_row(con)
+        levels = json.loads(torneio["levels_json"])
+        if _entradas_fechadas(levels, torneio["current_level_index"]):
+            raise HTTPException(400, "As entradas já foram encerradas para este torneio")
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1, eliminated = 0 WHERE id = ?",
             (participant_id,),

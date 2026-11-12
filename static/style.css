@@ -151,6 +151,29 @@ table.lista th { color: var(--texto-fraco); font-weight: 600; }
   font-size: 0.95rem;
 }
 
+.form-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--texto-fraco);
+}
+.campo input {
+  background: var(--bg);
+  border: 1px solid var(--borda);
+  color: var(--texto);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.campo-largo { grid-column: 1 / -1; }
+
 .totais { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .totais div { background: var(--bg); border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; }
 .totais .valor { font-size: 1.3rem; font-weight: 700; }

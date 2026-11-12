@@ -134,16 +134,22 @@
       var tdAcoes = el("td");
 
       if (p.eliminated) {
-        // Reentrada: jogador já marcado como eliminado volta pagando de novo (mesmo valor/fichas do rebuy).
-        var botaoReentrada = el("button", "botao", "Reentrada");
-        botaoReentrada.type = "button";
-        botaoReentrada.addEventListener("click", function () {
-          Api.enviarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
-            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-            if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; }
+        if (estado.tournament.entriesClosed) {
+          // Depois do nível marcado como "fecha entradas" no Admin, não é mais possível reentrar.
+          tdAcoes.appendChild(el("span", "chip eliminado", "entradas encerradas"));
+        } else {
+          // Reentrada: jogador já marcado como eliminado volta pagando de novo (mesmo valor/fichas do rebuy).
+          var botaoReentrada = el("button", "botao", "Reentrada");
+          botaoReentrada.type = "button";
+          botaoReentrada.addEventListener("click", function () {
+            Api.enviarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
+              var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+              if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; }
+            });
           });
-        });
-        tdAcoes.appendChild(botaoReentrada);
+          tdAcoes.appendChild(botaoReentrada);
+        }
+        // Enquanto eliminado, só a reentrada fica disponível — sem botão de remover por engano.
       } else {
         // Rebuy: jogador ainda ativo compra fichas de novo sem nunca ter saído da lista de ativos.
         var botaoRebuy = el("button", "botao", "Rebuy");
@@ -164,17 +170,17 @@
         });
         tdAcoes.appendChild(botaoRebuy);
         tdAcoes.appendChild(botaoElim);
-      }
 
-      var botaoRemover = el("button", "botao perigo", "Remover");
-      botaoRemover.type = "button";
-      botaoRemover.addEventListener("click", function () {
-        if (!confirm("Remover " + p.name + "?")) return;
-        Api.enviarAcao("/api/participants/" + p.id, "DELETE", null, function (rascunho) {
-          rascunho.participants = rascunho.participants.filter(function (x) { return x.id !== p.id; });
+        var botaoRemover = el("button", "botao perigo", "Remover");
+        botaoRemover.type = "button";
+        botaoRemover.addEventListener("click", function () {
+          if (!confirm("Remover " + p.name + "?")) return;
+          Api.enviarAcao("/api/participants/" + p.id, "DELETE", null, function (rascunho) {
+            rascunho.participants = rascunho.participants.filter(function (x) { return x.id !== p.id; });
+          });
         });
-      });
-      tdAcoes.appendChild(botaoRemover);
+        tdAcoes.appendChild(botaoRemover);
+      }
       tr.appendChild(tdAcoes);
 
       tbody.appendChild(tr);
@@ -248,6 +254,17 @@
       });
       tdPausa.appendChild(checkPausa);
       tr.appendChild(tdPausa);
+
+      var tdFechaEntradas = el("td");
+      var checkFechaEntradas = el("input");
+      checkFechaEntradas.type = "checkbox";
+      checkFechaEntradas.checked = !!nivel.closesEntries;
+      checkFechaEntradas.title = "A partir deste nível, não é mais possível fazer reentrada";
+      checkFechaEntradas.addEventListener("change", function () {
+        salvarNiveis(mutarNivel(i, "closesEntries", checkFechaEntradas.checked));
+      });
+      tdFechaEntradas.appendChild(checkFechaEntradas);
+      tr.appendChild(tdFechaEntradas);
 
       var tdRemover = el("td");
       var botaoRemover = el("button", "botao perigo", "x");

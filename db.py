@@ -17,7 +17,7 @@ NIVEIS_PADRAO = [
     {"sb": 600, "bb": 1200, "ante": 0, "minutes": 12, "isBreak": False},
     {"sb": 700, "bb": 1500, "ante": 0, "minutes": 12, "isBreak": False},
     {"sb": 1000, "bb": 2000, "ante": 0, "minutes": 12, "isBreak": False},
-    {"sb": 0, "bb": 0, "ante": 0, "minutes": 15, "isBreak": True},
+    {"sb": 0, "bb": 0, "ante": 0, "minutes": 15, "isBreak": True, "closesEntries": True},
     {"sb": 1000, "bb": 2000, "ante": 0, "minutes": 10, "isBreak": False},
     {"sb": 1500, "bb": 3000, "ante": 0, "minutes": 10, "isBreak": False},
     {"sb": 2000, "bb": 4000, "ante": 0, "minutes": 10, "isBreak": False},

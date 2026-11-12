@@ -106,14 +106,14 @@
     <div class="grade-admin">
       <div class="cartao">
         <h3>Torneio</h3>
-        <form class="form-inline" id="form-admin-geral">
-          <input type="text" id="admin-input-nome" placeholder="Nome do torneio">
-          <input type="number" id="admin-input-entry" placeholder="Fichas buy-in">
-          <input type="number" id="admin-input-reentry" placeholder="Fichas rebuy">
-          <input type="number" id="admin-input-addon" placeholder="Fichas add-on">
-          <input type="number" id="admin-input-preco" placeholder="Preço por ação (R$)" step="0.01">
-          <input type="number" id="admin-input-dealer" placeholder="Parte do dealer (R$)" step="0.01">
-          <input type="text" id="admin-input-fichas" placeholder="Valores de ficha disponíveis">
+        <form class="form-grade" id="form-admin-geral">
+          <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
+          <label class="campo">Fichas do buy-in<input type="number" id="admin-input-entry"></label>
+          <label class="campo">Fichas do rebuy<input type="number" id="admin-input-reentry"></label>
+          <label class="campo">Fichas do add-on<input type="number" id="admin-input-addon"></label>
+          <label class="campo">Preço por ação (R$)<input type="number" id="admin-input-preco" step="0.01"></label>
+          <label class="campo">Parte do dealer por ação (R$)<input type="number" id="admin-input-dealer" step="0.01"></label>
+          <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
         </form>
         <button class="botao perigo" id="admin-botao-novo-torneio" type="button">Iniciar novo torneio</button>
       </div>
@@ -121,7 +121,7 @@
       <div class="cartao">
         <h3>Estrutura de níveis</h3>
         <table class="lista niveis">
-          <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Min</th><th>Pausa</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Min</th><th>Pausa</th><th>Fecha entradas</th><th></th></tr></thead>
           <tbody id="admin-lista-niveis"></tbody>
         </table>
         <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
