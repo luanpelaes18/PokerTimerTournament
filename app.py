@@ -152,6 +152,7 @@ def montar_snapshot(con) -> dict:
             "addon": bool(p["addon"]),
             "paid": bool(p["paid"]),
             "eliminated": bool(p["eliminated"]),
+            "owed": devido,
             "createdAt": p["created_at"],
         })
 
@@ -241,6 +242,22 @@ async def registrar_rebuy(participant_id: str):
     try:
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1 WHERE id = ?", (participant_id,)
+        )
+        con.commit()
+    finally:
+        con.close()
+    return await publicar_estado()
+
+
+@app.post("/api/participants/{participant_id}/reentry")
+async def registrar_reentrada(participant_id: str):
+    # Mesmo custo/fichas de um rebuy, mas usado após o jogador já ter sido
+    # marcado como eliminado (reentrada tardia) — por isso também reativa.
+    con = db.conectar()
+    try:
+        con.execute(
+            "UPDATE participants SET rebuys = rebuys + 1, eliminated = 0 WHERE id = ?",
+            (participant_id,),
         )
         con.commit()
     finally:

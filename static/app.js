@@ -104,12 +104,14 @@
         botaoAddon.addEventListener("click", function () {
           Api.enviarAcao("/api/participants/" + p.id + "/addon", "POST", {}, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-            if (alvo) alvo.addon = true;
+            if (alvo) { alvo.addon = true; alvo.owed += rascunho.tournament.actionPrice; }
           });
         });
         tdAddon.appendChild(botaoAddon);
       }
       tr.appendChild(tdAddon);
+
+      tr.appendChild(el("td", null, fmtMoeda(p.owed)));
 
       var tdPago = el("td");
       var checkPago = el("input");
@@ -130,23 +132,40 @@
       tr.appendChild(tdStatus);
 
       var tdAcoes = el("td");
-      var botaoRebuy = el("button", "botao", "Rebuy");
-      botaoRebuy.type = "button";
-      botaoRebuy.addEventListener("click", function () {
-        Api.enviarAcao("/api/participants/" + p.id + "/rebuy", "POST", {}, function (rascunho) {
-          var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-          if (alvo) alvo.rebuys += 1;
+
+      if (p.eliminated) {
+        // Reentrada: jogador já marcado como eliminado volta pagando de novo (mesmo valor/fichas do rebuy).
+        var botaoReentrada = el("button", "botao", "Reentrada");
+        botaoReentrada.type = "button";
+        botaoReentrada.addEventListener("click", function () {
+          Api.enviarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
+            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+            if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; }
+          });
         });
-      });
-      var botaoElim = el("button", "botao", p.eliminated ? "Reativar" : "Eliminar");
-      botaoElim.type = "button";
-      botaoElim.addEventListener("click", function () {
-        var novoValor = !p.eliminated;
-        Api.enviarAcao("/api/participants/" + p.id, "PATCH", { eliminated: novoValor }, function (rascunho) {
-          var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-          if (alvo) alvo.eliminated = novoValor;
+        tdAcoes.appendChild(botaoReentrada);
+      } else {
+        // Rebuy: jogador ainda ativo compra fichas de novo sem nunca ter saído da lista de ativos.
+        var botaoRebuy = el("button", "botao", "Rebuy");
+        botaoRebuy.type = "button";
+        botaoRebuy.addEventListener("click", function () {
+          Api.enviarAcao("/api/participants/" + p.id + "/rebuy", "POST", {}, function (rascunho) {
+            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+            if (alvo) { alvo.rebuys += 1; alvo.owed += rascunho.tournament.actionPrice; }
+          });
         });
-      });
+        var botaoElim = el("button", "botao", "Eliminar");
+        botaoElim.type = "button";
+        botaoElim.addEventListener("click", function () {
+          Api.enviarAcao("/api/participants/" + p.id, "PATCH", { eliminated: true }, function (rascunho) {
+            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+            if (alvo) alvo.eliminated = true;
+          });
+        });
+        tdAcoes.appendChild(botaoRebuy);
+        tdAcoes.appendChild(botaoElim);
+      }
+
       var botaoRemover = el("button", "botao perigo", "Remover");
       botaoRemover.type = "button";
       botaoRemover.addEventListener("click", function () {
@@ -155,8 +174,6 @@
           rascunho.participants = rascunho.participants.filter(function (x) { return x.id !== p.id; });
         });
       });
-      tdAcoes.appendChild(botaoRebuy);
-      tdAcoes.appendChild(botaoElim);
       tdAcoes.appendChild(botaoRemover);
       tr.appendChild(tdAcoes);
 
@@ -423,7 +440,7 @@
       if (!nome) return;
       var idTemp = "tmp-" + Date.now();
       Api.enviarAcao("/api/participants", "POST", { name: nome }, function (rascunho) {
-        rascunho.participants.push({ id: idTemp, name: nome, rebuys: 0, addon: false, paid: false, eliminated: false, createdAt: new Date().toISOString() });
+        rascunho.participants.push({ id: idTemp, name: nome, rebuys: 0, addon: false, paid: false, eliminated: false, owed: rascunho.tournament.actionPrice, createdAt: new Date().toISOString() });
       });
       input.value = "";
     });
