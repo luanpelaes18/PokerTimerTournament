@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f1220">
+  <title>Poker Timer Tournament</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- #menu -->
+  <section id="tela-menu" class="tela">
+    <div class="topo">
+      <h1 id="menu-nome-torneio">Poker Timer Tournament</h1>
+      <div class="nav-telas">
+        <span id="selo-conexao" class="selo-conexao">conectando…</span>
+        <button class="botao" id="botao-tema" type="button">Tema</button>
+      </div>
+    </div>
+    <div class="grade-menu">
+      <a class="cartao" href="#gerente">Gerente<span>Jogadores, rebuy, add-on e pagamentos</span></a>
+      <a class="cartao" href="#timer">Timer<span>Relógio para a TV/monitor</span></a>
+      <a class="cartao" href="#admin">Admin<span>Estrutura, valores e controle total</span></a>
+      <a class="cartao" href="#historico">Histórico<span>Torneios anteriores</span></a>
+    </div>
+  </section>
+
+  <!-- #gerente -->
+  <section id="tela-gerente" class="tela">
+    <div class="topo">
+      <h1>Gerente — <span id="gerente-nome-torneio"></span></h1>
+      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+    </div>
+
+    <div class="cartao">
+      <div class="totais" id="gerente-totais"></div>
+    </div>
+
+    <div class="cartao">
+      <form class="form-inline" id="form-novo-participante">
+        <input type="text" id="input-novo-participante" placeholder="Nome do jogador" required>
+        <button class="botao primario" type="submit">Adicionar</button>
+      </form>
+      <table class="lista">
+        <thead>
+          <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Pago</th><th>Status</th><th>Ações</th></tr>
+        </thead>
+        <tbody id="gerente-lista-jogadores"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- #timer -->
+  <section id="tela-timer" class="tela">
+    <div class="topo">
+      <h1 id="timer-nome-torneio"></h1>
+      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+    </div>
+
+    <p class="timer-rotulo" id="timer-rotulo-nivel">Nível 1</p>
+    <div class="timer-blinds" id="timer-blinds">—</div>
+    <div class="timer-relogio" id="timer-relogio">00:00</div>
+    <p class="timer-prox" id="timer-proximo-nivel"></p>
+
+    <div class="timer-stats">
+      <div><div class="valor" id="timer-prize-pool">R$ 0</div><div class="rotulo">Prêmio acumulado</div></div>
+      <div><div class="valor" id="timer-jogadores-ativos">0</div><div class="rotulo">Jogadores ativos</div></div>
+      <div><div class="valor" id="timer-stack-medio">0</div><div class="rotulo">Stack médio</div></div>
+    </div>
+
+    <div class="controles-timer">
+      <button class="botao" id="timer-botao-prev" type="button">⏮ Anterior</button>
+      <button class="botao primario" id="timer-botao-playpause" type="button">▶ Tocar</button>
+      <button class="botao" id="timer-botao-next" type="button">Próximo ⏭</button>
+      <button class="botao" id="timer-botao-menos1" type="button">-1 min</button>
+      <button class="botao" id="timer-botao-mais1" type="button">+1 min</button>
+    </div>
+  </section>
+
+  <!-- #admin -->
+  <section id="tela-admin" class="tela">
+    <div class="topo">
+      <h1>Admin</h1>
+      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+    </div>
+
+    <div class="cartao">
+      <div class="totais" id="admin-totais"></div>
+    </div>
+
+    <div class="cartao">
+      <p class="timer-rotulo" id="admin-rotulo-nivel">Nível 1</p>
+      <div class="timer-blinds" id="admin-blinds" style="font-size:1.6rem">—</div>
+      <div class="timer-relogio" id="admin-relogio" style="font-size:clamp(3rem,10vw,6rem)">00:00</div>
+      <div class="controles-timer">
+        <button class="botao" id="admin-botao-prev" type="button">⏮ Anterior</button>
+        <button class="botao primario" id="admin-botao-playpause" type="button">▶ Tocar</button>
+        <button class="botao" id="admin-botao-next" type="button">Próximo ⏭</button>
+        <button class="botao" id="admin-botao-menos1" type="button">-1 min</button>
+        <button class="botao" id="admin-botao-mais1" type="button">+1 min</button>
+        <button class="botao" id="admin-botao-mudo" type="button">🔈 Som</button>
+      </div>
+    </div>
+
+    <div class="grade-admin">
+      <div class="cartao">
+        <h3>Torneio</h3>
+        <form class="form-inline" id="form-admin-geral">
+          <input type="text" id="admin-input-nome" placeholder="Nome do torneio">
+          <input type="number" id="admin-input-entry" placeholder="Fichas buy-in">
+          <input type="number" id="admin-input-reentry" placeholder="Fichas rebuy">
+          <input type="number" id="admin-input-addon" placeholder="Fichas add-on">
+          <input type="number" id="admin-input-preco" placeholder="Preço por ação (R$)" step="0.01">
+          <input type="number" id="admin-input-dealer" placeholder="Parte do dealer (R$)" step="0.01">
+          <input type="text" id="admin-input-fichas" placeholder="Valores de ficha disponíveis">
+        </form>
+        <button class="botao perigo" id="admin-botao-novo-torneio" type="button">Iniciar novo torneio</button>
+      </div>
+
+      <div class="cartao">
+        <h3>Estrutura de níveis</h3>
+        <table class="lista niveis">
+          <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Min</th><th>Pausa</th><th></th></tr></thead>
+          <tbody id="admin-lista-niveis"></tbody>
+        </table>
+        <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- #historico -->
+  <section id="tela-historico" class="tela">
+    <div class="topo">
+      <h1>Histórico de torneios</h1>
+      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+    </div>
+    <div class="cartao">
+      <table class="lista">
+        <thead><tr><th>Torneio</th><th>Status</th><th>Criado em</th><th></th></tr></thead>
+        <tbody id="historico-lista"></tbody>
+      </table>
+    </div>
+    <div class="cartao" id="historico-relatorio" style="display:none"></div>
+  </section>
+
+  <!-- #offline -->
+  <section id="tela-offline" class="tela">
+    <div class="aviso-offline">
+      <h1>Sem conexão com o servidor</h1>
+      <p>Verifique se o servidor do torneio está rodando na rede local. Tentando reconectar automaticamente…</p>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="audio.js"></script>
+  <script src="api.js"></script>
+  <script src="timer.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
