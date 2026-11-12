@@ -114,6 +114,11 @@ def _entradas_fechadas(levels: list, current_level_index: int) -> bool:
     return current_level_index >= min(indices_fechamento)
 
 
+def _nome_participante(con, participant_id: str) -> str:
+    row = con.execute("SELECT name FROM participants WHERE id = ?", (participant_id,)).fetchone()
+    return row["name"] if row else ""
+
+
 def montar_snapshot(con) -> dict:
     row = _torneio_atual_row(con)
     participantes = con.execute(
@@ -224,10 +229,12 @@ async def criar_participante(body: NovoParticipante):
     try:
         tid = db.tournament_id_atual(con)
         pid = db.novo_id()
+        nome = body.name.strip()
         con.execute(
             "INSERT INTO participants (id, tournament_id, name, created_at) VALUES (?, ?, ?, ?)",
-            (pid, tid, body.name.strip(), db.agora_iso()),
+            (pid, tid, nome, db.agora_iso()),
         )
+        db.registrar_evento(con, tid, "entrada", pid, nome)
         con.commit()
     finally:
         con.close()
@@ -238,7 +245,10 @@ async def criar_participante(body: NovoParticipante):
 async def remover_participante(participant_id: str):
     con = db.conectar()
     try:
+        tid = db.tournament_id_atual(con)
+        nome = _nome_participante(con, participant_id)
         con.execute("DELETE FROM participants WHERE id = ?", (participant_id,))
+        db.registrar_evento(con, tid, "removido", participant_id, nome)
         con.commit()
     finally:
         con.close()
@@ -249,9 +259,12 @@ async def remover_participante(participant_id: str):
 async def registrar_rebuy(participant_id: str):
     con = db.conectar()
     try:
+        tid = db.tournament_id_atual(con)
+        nome = _nome_participante(con, participant_id)
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1 WHERE id = ?", (participant_id,)
         )
+        db.registrar_evento(con, tid, "rebuy", participant_id, nome)
         con.commit()
     finally:
         con.close()
@@ -268,10 +281,12 @@ async def registrar_reentrada(participant_id: str):
         levels = json.loads(torneio["levels_json"])
         if _entradas_fechadas(levels, torneio["current_level_index"]):
             raise HTTPException(400, "As entradas já foram encerradas para este torneio")
+        nome = _nome_participante(con, participant_id)
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1, eliminated = 0 WHERE id = ?",
             (participant_id,),
         )
+        db.registrar_evento(con, torneio["id"], "reentrada", participant_id, nome)
         con.commit()
     finally:
         con.close()
@@ -282,9 +297,12 @@ async def registrar_reentrada(participant_id: str):
 async def registrar_addon(participant_id: str):
     con = db.conectar()
     try:
+        tid = db.tournament_id_atual(con)
+        nome = _nome_participante(con, participant_id)
         con.execute(
             "UPDATE participants SET addon = 1 WHERE id = ?", (participant_id,)
         )
+        db.registrar_evento(con, tid, "addon", participant_id, nome)
         con.commit()
     finally:
         con.close()
@@ -304,10 +322,14 @@ async def atualizar_participante(participant_id: str, body: ParticipanteUpdate):
     if campos:
         con = db.conectar()
         try:
+            tid = db.tournament_id_atual(con)
+            nome = _nome_participante(con, participant_id)
             valores.append(participant_id)
             con.execute(
                 f"UPDATE participants SET {', '.join(campos)} WHERE id = ?", valores
             )
+            if body.eliminated is True:
+                db.registrar_evento(con, tid, "saida", participant_id, nome)
             con.commit()
         finally:
             con.close()
@@ -434,16 +456,37 @@ async def timer_adjust(body: AjusteTimer):
     return await publicar_estado()
 
 
+def _finalizar_torneio(con, tournament_id: str):
+    con.execute(
+        "UPDATE tournaments SET status = 'finished', finished_at = ? WHERE id = ?",
+        (db.agora_iso(), tournament_id),
+    )
+    db.registrar_evento(con, tournament_id, "torneio_finalizado")
+
+
+@app.post("/api/tournaments/finalizar")
+async def finalizar_torneio():
+    con = db.conectar()
+    try:
+        row = _torneio_atual_row(con)
+        if row["status"] == "finished":
+            raise HTTPException(400, "Este torneio já está finalizado")
+        _finalizar_torneio(con, row["id"])
+        con.commit()
+    finally:
+        con.close()
+    return await publicar_estado()
+
+
 @app.post("/api/tournaments/novo")
 async def novo_torneio(body: NovoTorneio):
     con = db.conectar()
     try:
         tid_atual = db.tournament_id_atual(con)
         if tid_atual:
-            con.execute(
-                "UPDATE tournaments SET status = 'finished', finished_at = ? WHERE id = ?",
-                (db.agora_iso(), tid_atual),
-            )
+            row = _torneio_atual_row(con)
+            if row["status"] != "finished":
+                _finalizar_torneio(con, tid_atual)
             con.commit()
         db.criar_torneio(con, nome=body.name)
     finally:
@@ -493,6 +536,11 @@ def relatorio_torneio(tournament_id: str):
                 "eliminated": bool(p["eliminated"]),
             })
 
+        eventos = con.execute(
+            "SELECT type, details, created_at FROM events WHERE tournament_id = ? ORDER BY created_at",
+            (tournament_id,),
+        ).fetchall()
+
         return {
             "id": row["id"],
             "name": row["name"],
@@ -505,6 +553,10 @@ def relatorio_torneio(tournament_id: str):
                 "prizePool": total_actions * (action_price - dealer_share),
                 "dealerTotal": total_actions * dealer_share,
             },
+            "events": [
+                {"type": e["type"], "detail": e["details"], "createdAt": e["created_at"]}
+                for e in eventos
+            ],
         }
     finally:
         con.close()

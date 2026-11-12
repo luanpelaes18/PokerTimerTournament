@@ -83,6 +83,15 @@ def inicializar():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS events (
+            id TEXT PRIMARY KEY,
+            tournament_id TEXT NOT NULL,
+            participant_id TEXT,
+            type TEXT NOT NULL,
+            details TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
         """
     )
     con.commit()
@@ -93,6 +102,13 @@ def inicializar():
     if atual is None:
         criar_torneio(con, nome="Home Game")
     con.close()
+
+
+def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):
+    con.execute(
+        "INSERT INTO events (id, tournament_id, participant_id, type, details, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (novo_id(), tournament_id, participant_id, tipo, detalhe, agora_iso()),
+    )
 
 
 def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
@@ -123,6 +139,7 @@ def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
         """,
         (tid,),
     )
+    registrar_evento(con, tid, "torneio_criado", None, nome)
     con.commit()
     return tid
 

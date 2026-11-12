@@ -417,7 +417,38 @@
         });
         tabela.appendChild(tbody);
         caixa.appendChild(tabela);
+
+        caixa.appendChild(el("h3", null, "Linha do tempo"));
+        if (!rel.events || !rel.events.length) {
+          caixa.appendChild(el("p", "rotulo", "Sem eventos registrados."));
+        } else {
+          var listaEventos = el("ul", "tags");
+          listaEventos.style.flexDirection = "column";
+          listaEventos.style.alignItems = "flex-start";
+          listaEventos.style.gap = "6px";
+          rel.events.forEach(function (ev) {
+            var hora = new Date(ev.createdAt).toLocaleString("pt-BR");
+            listaEventos.appendChild(el("li", null, hora + " — " + fmtEvento(ev)));
+          });
+          caixa.appendChild(listaEventos);
+        }
       });
+  }
+
+  var ROTULOS_EVENTO = {
+    torneio_criado: "Torneio criado",
+    torneio_finalizado: "Torneio finalizado",
+    entrada: "Entrada",
+    rebuy: "Rebuy",
+    addon: "Add-on",
+    reentrada: "Reentrada",
+    saida: "Saída (eliminado)",
+    removido: "Removido",
+  };
+
+  function fmtEvento(ev) {
+    var rotulo = ROTULOS_EVENTO[ev.type] || ev.type;
+    return ev.detail ? (rotulo + ": " + ev.detail) : rotulo;
   }
 
   // ------------------------------------------------------------------- tema --
@@ -506,8 +537,13 @@
       salvarNiveisDireto(novosNiveis);
     });
 
+    document.getElementById("admin-botao-finalizar-torneio").addEventListener("click", function () {
+      if (!confirm("Finalizar o torneio atual? Ele vai para o histórico e os controles de timer/jogadores param de valer até você iniciar um novo.")) return;
+      Api.enviarAcao("/api/tournaments/finalizar", "POST", {});
+    });
+
     document.getElementById("admin-botao-novo-torneio").addEventListener("click", function () {
-      if (!confirm("Isso finaliza o torneio atual e começa um novo (zera jogadores). Continuar?")) return;
+      if (!confirm("Isso finaliza o torneio atual (se ainda não estiver finalizado) e começa um novo (zera jogadores). Continuar?")) return;
       var nome = prompt("Nome do novo torneio:", "Home Game") || "Home Game";
       Api.enviarAcao("/api/tournaments/novo", "POST", { name: nome });
     });
