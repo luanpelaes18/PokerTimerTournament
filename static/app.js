@@ -53,6 +53,153 @@
     return e;
   }
 
+  // --------------------------------------------------- rascunhos de torneio --
+  // Gerente/Admin podem visualizar e editar um torneio diferente do que está
+  // "ao vivo" (ex: preparar a estrutura do próximo jogo com antecedência).
+  // Só o torneio atual (torneioSelecionadoId === null ou igual ao id ao vivo)
+  // tem os controles de timer liberados — "só um pode ser tocado".
+
+  var torneioSelecionadoId = null; // null = segue o torneio atual
+  var estadoRascunho = null;
+  var SELETORES_TORNEIO = ["gerente-seletor-torneio", "admin-seletor-torneio"];
+  var BOTOES_ATIVAR = ["gerente-botao-ativar", "admin-botao-ativar"];
+  var BOTOES_NOVO_RASCUNHO = ["gerente-botao-novo-rascunho", "admin-botao-novo-rascunho"];
+
+  function emModoRascunho() {
+    var atual = Api.obterEstado();
+    return !!(torneioSelecionadoId && (!atual || torneioSelecionadoId !== atual.tournament.id));
+  }
+
+  function estadoExibido() {
+    return emModoRascunho() ? estadoRascunho : Api.obterEstado();
+  }
+
+  function executarAcao(url, metodo, corpo, mutacaoOtimista) {
+    if (!emModoRascunho()) return Api.enviarAcao(url, metodo, corpo, mutacaoOtimista);
+    var corpoFinal = Object.assign({}, corpo || {});
+    if (torneioSelecionadoId) corpoFinal.tournamentId = torneioSelecionadoId;
+    return fetch(url, {
+      method: metodo,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpoFinal),
+    })
+      .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+      .then(function (novo) {
+        estadoRascunho = novo;
+        renderizarGerente(novo);
+        renderizarAdmin(novo);
+        atualizarBotaoAtivar();
+        return novo;
+      })
+      .catch(function () { Api.avisar("Não foi possível salvar. Tente novamente."); });
+  }
+
+  function atualizarBotaoAtivar() {
+    var rascunho = emModoRascunho();
+    var mostrar = rascunho && estadoRascunho && estadoRascunho.tournament.status !== "finished";
+    BOTOES_ATIVAR.forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.style.display = mostrar ? "" : "none";
+    });
+    // Finalizar/Iniciar novo torneio sempre agem no torneio ao vivo — travar enquanto
+    // se está olhando um rascunho evita finalizar o torneio errado sem querer.
+    ["gerente-botao-finalizar-torneio", "admin-botao-finalizar-torneio", "admin-botao-novo-torneio"].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) {
+        b.disabled = rascunho;
+        b.title = rascunho ? "Selecione o torneio atual para usar este controle" : "";
+      }
+    });
+  }
+
+  function popularSeletores(lista) {
+    var atual = Api.obterEstado();
+    var idAtual = atual ? atual.tournament.id : null;
+    SELETORES_TORNEIO.forEach(function (idSel) {
+      var sel = document.getElementById(idSel);
+      if (!sel || document.activeElement === sel) return;
+      sel.textContent = "";
+      lista.forEach(function (t) {
+        var opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = t.name + (t.id === idAtual ? " (atual)" : "") + " — " + t.status;
+        sel.appendChild(opt);
+      });
+      sel.value = torneioSelecionadoId || idAtual || "";
+    });
+  }
+
+  function carregarListaTorneios() {
+    return fetch("/api/tournaments").then(function (r) { return r.json(); });
+  }
+
+  function atualizarListaTorneios() {
+    carregarListaTorneios().then(popularSeletores);
+  }
+
+  function selecionarTorneio(id) {
+    torneioSelecionadoId = id || null;
+    SELETORES_TORNEIO.forEach(function (sel) {
+      var el2 = document.getElementById(sel);
+      if (el2) el2.value = torneioSelecionadoId || "";
+    });
+    if (emModoRascunho()) {
+      fetch("/api/state?tournament_id=" + encodeURIComponent(torneioSelecionadoId))
+        .then(function (r) { return r.json(); })
+        .then(function (novo) {
+          estadoRascunho = novo;
+          renderizarGerente(novo);
+          renderizarAdmin(novo);
+          atualizarBotaoAtivar();
+        });
+    } else {
+      estadoRascunho = null;
+      var atual = Api.obterEstado();
+      if (atual) { renderizarGerente(atual); renderizarAdmin(atual); }
+      atualizarBotaoAtivar();
+    }
+  }
+
+  function wireSeletorTorneio() {
+    SELETORES_TORNEIO.forEach(function (idSel) {
+      var sel = document.getElementById(idSel);
+      if (sel) sel.addEventListener("change", function () { selecionarTorneio(sel.value); });
+    });
+    BOTOES_NOVO_RASCUNHO.forEach(function (idBotao) {
+      var botao = document.getElementById(idBotao);
+      if (!botao) return;
+      botao.addEventListener("click", function () {
+        var nome = prompt("Nome do novo rascunho de torneio:", "Próximo Home Game");
+        if (!nome) return;
+        fetch("/api/tournaments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: nome }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (novo) {
+            atualizarListaTorneios();
+            selecionarTorneio(novo.tournament.id);
+          });
+      });
+    });
+    BOTOES_ATIVAR.forEach(function (idBotao) {
+      var botao = document.getElementById(idBotao);
+      if (!botao) return;
+      botao.addEventListener("click", function () {
+        if (!torneioSelecionadoId) return;
+        if (!confirm("Ativar este torneio como o atual? Isso finaliza o torneio que está rodando agora (se ainda não estiver finalizado).")) return;
+        fetch("/api/tournaments/" + torneioSelecionadoId + "/ativar", { method: "POST" })
+          .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+          .then(function () {
+            atualizarListaTorneios();
+            selecionarTorneio(null);
+          })
+          .catch(function () { Api.avisar("Não foi possível ativar este torneio."); });
+      });
+    });
+  }
+
   // ------------------------------------------------------------- roteador --
 
   var statusConexaoAtual = "conectando";
@@ -65,6 +212,7 @@
     if (secao) secao.classList.add("ativa");
     else document.getElementById("tela-menu").classList.add("ativa");
     if (alvo === "historico") carregarHistorico();
+    if (alvo === "gerente" || alvo === "admin") atualizarListaTorneios();
   }
 
   window.addEventListener("hashchange", function () {
@@ -116,7 +264,7 @@
         var botaoAddon = el("button", "botao", "Add-on");
         botaoAddon.type = "button";
         botaoAddon.addEventListener("click", function () {
-          Api.enviarAcao("/api/participants/" + p.id + "/addon", "POST", {}, function (rascunho) {
+          executarAcao("/api/participants/" + p.id + "/addon", "POST", {}, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
             if (alvo) { alvo.addon = true; alvo.owed += rascunho.tournament.actionPrice; }
           });
@@ -133,7 +281,7 @@
       checkPago.checked = p.paid;
       checkPago.addEventListener("change", function () {
         var novoValor = checkPago.checked;
-        Api.enviarAcao("/api/participants/" + p.id, "PATCH", { paid: novoValor }, function (rascunho) {
+        executarAcao("/api/participants/" + p.id, "PATCH", { paid: novoValor }, function (rascunho) {
           var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
           if (alvo) alvo.paid = novoValor;
         });
@@ -156,7 +304,7 @@
           var botaoReentrada = el("button", "botao", "Reentrada");
           botaoReentrada.type = "button";
           botaoReentrada.addEventListener("click", function () {
-            Api.enviarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
+            executarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
               var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
               if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; }
             });
@@ -169,7 +317,7 @@
         var botaoRebuy = el("button", "botao", "Rebuy");
         botaoRebuy.type = "button";
         botaoRebuy.addEventListener("click", function () {
-          Api.enviarAcao("/api/participants/" + p.id + "/rebuy", "POST", {}, function (rascunho) {
+          executarAcao("/api/participants/" + p.id + "/rebuy", "POST", {}, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
             if (alvo) { alvo.rebuys += 1; alvo.owed += rascunho.tournament.actionPrice; }
           });
@@ -177,7 +325,7 @@
         var botaoElim = el("button", "botao", "Eliminar");
         botaoElim.type = "button";
         botaoElim.addEventListener("click", function () {
-          Api.enviarAcao("/api/participants/" + p.id, "PATCH", { eliminated: true }, function (rascunho) {
+          executarAcao("/api/participants/" + p.id, "PATCH", { eliminated: true }, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
             if (alvo) alvo.eliminated = true;
           });
@@ -189,7 +337,7 @@
         botaoRemover.type = "button";
         botaoRemover.addEventListener("click", function () {
           if (!confirm("Remover " + p.name + "?")) return;
-          Api.enviarAcao("/api/participants/" + p.id, "DELETE", null, function (rascunho) {
+          executarAcao("/api/participants/" + p.id, "DELETE", null, function (rascunho) {
             rascunho.participants = rascunho.participants.filter(function (x) { return x.id !== p.id; });
           });
         });
@@ -289,7 +437,7 @@
       var botaoRemover = el("button", "botao perigo", "x");
       botaoRemover.type = "button";
       botaoRemover.addEventListener("click", function () {
-        var estado = Api.obterEstado();
+        var estado = estadoExibido();
         var novosNiveis = estado.tournament.levels.filter(function (_, idx) { return idx !== i; });
         salvarNiveisDireto(novosNiveis);
       });
@@ -301,7 +449,7 @@
   }
 
   function mutarNivel(indice, chave, valor) {
-    var estado = Api.obterEstado();
+    var estado = estadoExibido();
     var novosNiveis = estado.tournament.levels.map(function (n, idx) {
       if (idx !== indice) return n;
       var copia = Object.assign({}, n);
@@ -312,7 +460,7 @@
   }
 
   var salvarNiveisDireto = function (novosNiveis) {
-    Api.enviarAcao("/api/admin", "PATCH", { levels: novosNiveis }, function (rascunho) {
+    executarAcao("/api/admin", "PATCH", { levels: novosNiveis }, function (rascunho) {
       rascunho.tournament.levels = novosNiveis;
     });
   };
@@ -345,21 +493,34 @@
     var elProx = document.getElementById("timer-proximo-nivel");
     if (elProx) elProx.textContent = proximo ? ("Próximo: " + fmtBlind(proximo)) : "Último nível";
 
+    var emRascunho = emModoRascunho();
+    var tituloRascunho = "Selecione o torneio atual (não um rascunho) para controlar o timer";
+
     ["timer-botao-playpause", "admin-botao-playpause"].forEach(function (id) {
       var botao = document.getElementById(id);
       if (!botao) return;
       botao.textContent = torneio.status === "running" ? "⏸ Pausar" : "▶ Tocar";
-      var bloqueado = !torneio.configured && torneio.status !== "running";
+      var bloqueadoRascunho = id.indexOf("admin-") === 0 && emRascunho;
+      var bloqueado = bloqueadoRascunho || (!torneio.configured && torneio.status !== "running");
       botao.disabled = bloqueado;
-      botao.title = bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "";
+      botao.title = bloqueadoRascunho ? tituloRascunho : (bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "");
+    });
+
+    ["admin-botao-prev", "admin-botao-next", "admin-botao-mais1", "admin-botao-menos1"].forEach(function (id) {
+      var botao = document.getElementById(id);
+      if (!botao) return;
+      botao.disabled = emRascunho;
+      botao.title = emRascunho ? tituloRascunho : "";
     });
   };
 
   function renderTudo(estado) {
     renderizarMenu(estado);
-    renderizarGerente(estado);
     renderizarTimerEstatico(estado);
-    renderizarAdmin(estado);
+    if (!emModoRascunho()) {
+      renderizarGerente(estado);
+      renderizarAdmin(estado);
+    }
   }
 
   // ---------------------------------------------------------------- conexão --
@@ -515,7 +676,7 @@
       var nome = input.value.trim();
       if (!nome) return;
       var idTemp = "tmp-" + Date.now();
-      Api.enviarAcao("/api/participants", "POST", { name: nome }, function (rascunho) {
+      executarAcao("/api/participants", "POST", { name: nome }, function (rascunho) {
         rascunho.participants.push({ id: idTemp, name: nome, rebuys: 0, addon: false, paid: false, eliminated: false, owed: rascunho.tournament.actionPrice, createdAt: new Date().toISOString() });
       });
       input.value = "";
@@ -544,19 +705,19 @@
     document.getElementById("admin-botao-confirmar").addEventListener("click", function () {
       var corpo = lerCamposGeraisAdmin();
       corpo.configured = true;
-      Api.enviarAcao("/api/admin", "PATCH", corpo, function (rascunho) {
+      executarAcao("/api/admin", "PATCH", corpo, function (rascunho) {
         Object.assign(rascunho.tournament, corpo);
       });
     });
 
     document.getElementById("admin-botao-mudo").addEventListener("click", function () {
-      var estado = Api.obterEstado();
+      var estado = estadoExibido();
       var novoMudo = !estado.tournament.muted;
-      Api.enviarAcao("/api/admin", "PATCH", { muted: novoMudo }, function (rascunho) { rascunho.tournament.muted = novoMudo; });
+      executarAcao("/api/admin", "PATCH", { muted: novoMudo }, function (rascunho) { rascunho.tournament.muted = novoMudo; });
     });
 
     document.getElementById("admin-botao-add-nivel").addEventListener("click", function () {
-      var estado = Api.obterEstado();
+      var estado = estadoExibido();
       var novosNiveis = estado.tournament.levels.concat([{ sb: 0, bb: 0, ante: 0, minutes: 10, isBreak: false }]);
       salvarNiveisDireto(novosNiveis);
     });
@@ -588,6 +749,7 @@
   wireGerenteForm();
   wireAdminForm();
   wireTema();
+  wireSeletorTorneio();
 
   Api.aoAtualizarEstado(renderTudo);
   Api.aoAtualizarConexao(atualizarSeloConexao);

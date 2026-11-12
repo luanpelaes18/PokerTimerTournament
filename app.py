@@ -18,6 +18,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 class NovoParticipante(BaseModel):
     name: str
+    tournamentId: Optional[str] = None
 
 
 class ParticipanteUpdate(BaseModel):
@@ -36,6 +37,7 @@ class AdminUpdate(BaseModel):
     chipValues: Optional[str] = None
     muted: Optional[bool] = None
     configured: Optional[bool] = None
+    tournamentId: Optional[str] = None
 
 
 class AjusteTimer(BaseModel):
@@ -78,13 +80,18 @@ class GerenciadorWS:
 ws_manager = GerenciadorWS()
 
 
-async def publicar_estado():
+async def publicar_estado(tournament_id: Optional[str] = None):
     con = db.conectar()
     try:
-        snapshot = montar_snapshot(con)
+        tid_atual = db.tournament_id_atual(con)
+        alvo = tournament_id or tid_atual
+        snapshot = montar_snapshot(con, alvo)
     finally:
         con.close()
-    await ws_manager.broadcast(snapshot)
+    # Só transmite por WS quando a mutação foi no torneio ao vivo — editar um
+    # rascunho não deve mexer no que telas (Timer/TV) de outros estão vendo.
+    if alvo == tid_atual:
+        await ws_manager.broadcast(snapshot)
     return snapshot
 
 
@@ -115,13 +122,27 @@ def _entradas_fechadas(levels: list, current_level_index: int) -> bool:
     return current_level_index >= min(indices_fechamento)
 
 
-def _nome_participante(con, participant_id: str) -> str:
-    row = con.execute("SELECT name FROM participants WHERE id = ?", (participant_id,)).fetchone()
-    return row["name"] if row else ""
+def _tournament_row(con, tournament_id: str):
+    row = con.execute("SELECT * FROM tournaments WHERE id = ?", (tournament_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Torneio não encontrado")
+    return row
 
 
-def montar_snapshot(con) -> dict:
-    row = _torneio_atual_row(con)
+def _garantir_editavel(row):
+    if row["status"] == "finished":
+        raise HTTPException(400, "Este torneio já foi finalizado e não pode mais ser alterado")
+
+
+def _participante_row(con, participant_id: str):
+    row = con.execute("SELECT * FROM participants WHERE id = ?", (participant_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Participante não encontrado")
+    return row
+
+
+def montar_snapshot(con, tournament_id: Optional[str] = None) -> dict:
+    row = _tournament_row(con, tournament_id) if tournament_id else _torneio_atual_row(con)
     participantes = con.execute(
         "SELECT * FROM participants WHERE tournament_id = ? ORDER BY created_at",
         (row["id"],),
@@ -217,10 +238,10 @@ def startup():
 
 
 @app.get("/api/state")
-def obter_estado():
+def obter_estado(tournament_id: Optional[str] = None):
     con = db.conectar()
     try:
-        return montar_snapshot(con)
+        return montar_snapshot(con, tournament_id)
     finally:
         con.close()
 
@@ -229,7 +250,9 @@ def obter_estado():
 async def criar_participante(body: NovoParticipante):
     con = db.conectar()
     try:
-        tid = db.tournament_id_atual(con)
+        tid = body.tournamentId or db.tournament_id_atual(con)
+        torneio = _tournament_row(con, tid)
+        _garantir_editavel(torneio)
         pid = db.novo_id()
         nome = body.name.strip()
         con.execute(
@@ -240,37 +263,39 @@ async def criar_participante(body: NovoParticipante):
         con.commit()
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(tid)
 
 
 @app.delete("/api/participants/{participant_id}")
 async def remover_participante(participant_id: str):
     con = db.conectar()
     try:
-        tid = db.tournament_id_atual(con)
-        nome = _nome_participante(con, participant_id)
+        p = _participante_row(con, participant_id)
+        torneio = _tournament_row(con, p["tournament_id"])
+        _garantir_editavel(torneio)
         con.execute("DELETE FROM participants WHERE id = ?", (participant_id,))
-        db.registrar_evento(con, tid, "removido", participant_id, nome)
+        db.registrar_evento(con, torneio["id"], "removido", participant_id, p["name"])
         con.commit()
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(torneio["id"])
 
 
 @app.post("/api/participants/{participant_id}/rebuy")
 async def registrar_rebuy(participant_id: str):
     con = db.conectar()
     try:
-        tid = db.tournament_id_atual(con)
-        nome = _nome_participante(con, participant_id)
+        p = _participante_row(con, participant_id)
+        torneio = _tournament_row(con, p["tournament_id"])
+        _garantir_editavel(torneio)
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1 WHERE id = ?", (participant_id,)
         )
-        db.registrar_evento(con, tid, "rebuy", participant_id, nome)
+        db.registrar_evento(con, torneio["id"], "rebuy", participant_id, p["name"])
         con.commit()
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(torneio["id"])
 
 
 @app.post("/api/participants/{participant_id}/reentry")
@@ -279,36 +304,38 @@ async def registrar_reentrada(participant_id: str):
     # marcado como eliminado (reentrada tardia) — por isso também reativa.
     con = db.conectar()
     try:
-        torneio = _torneio_atual_row(con)
+        p = _participante_row(con, participant_id)
+        torneio = _tournament_row(con, p["tournament_id"])
+        _garantir_editavel(torneio)
         levels = json.loads(torneio["levels_json"])
         if _entradas_fechadas(levels, torneio["current_level_index"]):
             raise HTTPException(400, "As entradas já foram encerradas para este torneio")
-        nome = _nome_participante(con, participant_id)
         con.execute(
             "UPDATE participants SET rebuys = rebuys + 1, eliminated = 0 WHERE id = ?",
             (participant_id,),
         )
-        db.registrar_evento(con, torneio["id"], "reentrada", participant_id, nome)
+        db.registrar_evento(con, torneio["id"], "reentrada", participant_id, p["name"])
         con.commit()
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(torneio["id"])
 
 
 @app.post("/api/participants/{participant_id}/addon")
 async def registrar_addon(participant_id: str):
     con = db.conectar()
     try:
-        tid = db.tournament_id_atual(con)
-        nome = _nome_participante(con, participant_id)
+        p = _participante_row(con, participant_id)
+        torneio = _tournament_row(con, p["tournament_id"])
+        _garantir_editavel(torneio)
         con.execute(
             "UPDATE participants SET addon = 1 WHERE id = ?", (participant_id,)
         )
-        db.registrar_evento(con, tid, "addon", participant_id, nome)
+        db.registrar_evento(con, torneio["id"], "addon", participant_id, p["name"])
         con.commit()
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(torneio["id"])
 
 
 @app.patch("/api/participants/{participant_id}")
@@ -321,21 +348,24 @@ async def atualizar_participante(participant_id: str, body: ParticipanteUpdate):
     if body.eliminated is not None:
         campos.append("eliminated = ?")
         valores.append(1 if body.eliminated else 0)
+    torneio_id = None
     if campos:
         con = db.conectar()
         try:
-            tid = db.tournament_id_atual(con)
-            nome = _nome_participante(con, participant_id)
+            p = _participante_row(con, participant_id)
+            torneio = _tournament_row(con, p["tournament_id"])
+            _garantir_editavel(torneio)
+            torneio_id = torneio["id"]
             valores.append(participant_id)
             con.execute(
                 f"UPDATE participants SET {', '.join(campos)} WHERE id = ?", valores
             )
             if body.eliminated is True:
-                db.registrar_evento(con, tid, "saida", participant_id, nome)
+                db.registrar_evento(con, torneio_id, "saida", participant_id, p["name"])
             con.commit()
         finally:
             con.close()
-    return await publicar_estado()
+    return await publicar_estado(torneio_id)
 
 
 @app.patch("/api/admin")
@@ -364,18 +394,20 @@ async def atualizar_admin(body: AdminUpdate):
                 valor = 1 if valor else 0
             campos.append(f"{coluna} = ?")
             valores.append(valor)
-    if campos:
-        con = db.conectar()
-        try:
-            tid = db.tournament_id_atual(con)
+    con = db.conectar()
+    try:
+        tid = body.tournamentId or db.tournament_id_atual(con)
+        torneio = _tournament_row(con, tid)
+        _garantir_editavel(torneio)
+        if campos:
             valores.append(tid)
             con.execute(
                 f"UPDATE tournaments SET {', '.join(campos)} WHERE id = ?", valores
             )
             con.commit()
-        finally:
-            con.close()
-    return await publicar_estado()
+    finally:
+        con.close()
+    return await publicar_estado(tid)
 
 
 def _aplicar_timer(con, row, **mudancas):
@@ -394,6 +426,7 @@ async def timer_play():
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        _garantir_editavel(row)
         if not row["configured"]:
             raise HTTPException(400, "Confirme a configuração do torneio no Admin antes de iniciar")
         if row["status"] != "running":
@@ -408,6 +441,7 @@ async def timer_pause():
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        _garantir_editavel(row)
         if row["status"] == "running":
             elapsed = _elapsed_seconds(row, datetime.now(timezone.utc))
             _aplicar_timer(con, row, status="paused", elapsed_before_ref=elapsed, reference_at=None)
@@ -421,6 +455,7 @@ async def timer_next(body: AvancoNivel = AvancoNivel()):
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        _garantir_editavel(row)
         if body.expectedIndex is None or body.expectedIndex == row["current_level_index"]:
             niveis = json.loads(row["levels_json"])
             novo_index = min(row["current_level_index"] + 1, len(niveis) - 1)
@@ -436,6 +471,7 @@ async def timer_prev():
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        _garantir_editavel(row)
         novo_index = max(row["current_level_index"] - 1, 0)
         ref = db.agora_iso() if row["status"] == "running" else None
         _aplicar_timer(con, row, current_level_index=novo_index, elapsed_before_ref=0, reference_at=ref)
@@ -449,6 +485,7 @@ async def timer_adjust(body: AjusteTimer):
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        _garantir_editavel(row)
         agora = datetime.now(timezone.utc)
         elapsed = _elapsed_seconds(row, agora)
         elapsed_novo = max(0.0, elapsed - body.deltaMinutes * 60)
@@ -497,6 +534,47 @@ async def novo_torneio(body: NovoTorneio):
     finally:
         con.close()
     return await publicar_estado()
+
+
+class NovoRascunho(BaseModel):
+    name: str = "Novo torneio"
+
+
+@app.post("/api/tournaments")
+async def criar_rascunho(body: NovoRascunho):
+    # Cria um torneio "de lado", sem mexer no que está ao vivo — serve para
+    # preparar a estrutura/valores do próximo jogo com antecedência.
+    con = db.conectar()
+    try:
+        tid = db.criar_torneio(con, nome=body.name, tornar_atual=False)
+    finally:
+        con.close()
+    return await publicar_estado(tid)
+
+
+@app.post("/api/tournaments/{tournament_id}/ativar")
+async def ativar_torneio(tournament_id: str):
+    con = db.conectar()
+    try:
+        alvo = _tournament_row(con, tournament_id)
+        if alvo["status"] == "finished":
+            raise HTTPException(400, "Este torneio já foi finalizado")
+        tid_atual = db.tournament_id_atual(con)
+        if tid_atual and tid_atual != tournament_id:
+            atual = _tournament_row(con, tid_atual)
+            if atual["status"] != "finished":
+                _finalizar_torneio(con, tid_atual)
+        con.execute(
+            """
+            INSERT INTO settings (key, value) VALUES ('current_tournament_id', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (tournament_id,),
+        )
+        con.commit()
+    finally:
+        con.close()
+    return await publicar_estado(tournament_id)
 
 
 @app.get("/api/tournaments")

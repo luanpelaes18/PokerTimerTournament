@@ -126,7 +126,7 @@ def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):
 
 def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
                    addon_value=2000, action_price=20.0, dealer_share=5.0,
-                   chip_values=CHIP_VALUES_PADRAO):
+                   chip_values=CHIP_VALUES_PADRAO, tornar_atual=True):
     tid = novo_id()
     con.execute(
         """
@@ -145,13 +145,14 @@ def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
             agora_iso(),
         ),
     )
-    con.execute(
-        """
-        INSERT INTO settings (key, value) VALUES ('current_tournament_id', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """,
-        (tid,),
-    )
+    if tornar_atual:
+        con.execute(
+            """
+            INSERT INTO settings (key, value) VALUES ('current_tournament_id', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (tid,),
+        )
     registrar_evento(con, tid, "torneio_criado", None, nome)
     con.commit()
     return tid
