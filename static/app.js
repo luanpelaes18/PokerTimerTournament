@@ -127,6 +127,33 @@
       });
       sel.value = torneioSelecionadoId || idAtual || "";
     });
+    renderizarListaRascunhos(lista);
+  }
+
+  function renderizarListaRascunhos(lista) {
+    var container = document.getElementById("admin-lista-rascunhos");
+    if (!container) return;
+    var atual = Api.obterEstado();
+    var idAtual = atual ? atual.tournament.id : null;
+    var rascunhos = lista.filter(function (t) { return t.status !== "finished" && t.id !== idAtual; });
+
+    container.textContent = "";
+    if (!rascunhos.length) {
+      container.appendChild(el("p", "rotulo", "Nenhum torneio salvo e não iniciado."));
+      return;
+    }
+    rascunhos.forEach(function (t) {
+      var linha = el("div", "linha-rascunho");
+      var info = el("div");
+      info.appendChild(el("strong", null, t.name));
+      info.appendChild(el("span", "rotulo", "criado em " + new Date(t.created_at).toLocaleString("pt-BR")));
+      var botao = el("button", "botao", "Gerenciar");
+      botao.type = "button";
+      botao.addEventListener("click", function () { selecionarTorneio(t.id); });
+      linha.appendChild(info);
+      linha.appendChild(botao);
+      container.appendChild(linha);
+    });
   }
 
   function carregarListaTorneios() {
