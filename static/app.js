@@ -23,6 +23,20 @@
     return txt;
   }
 
+  // Aceita abreviações tipo "2k" (2000) e "1.5m" (1500000) nos campos numéricos.
+  function parseNumeroAbreviado(valor) {
+    if (valor === null || valor === undefined) return 0;
+    var texto = String(valor).trim().toLowerCase().replace(",", ".");
+    if (!texto) return 0;
+    var combinado = texto.match(/^(-?\d+(?:\.\d+)?)\s*(k|m)$/);
+    if (combinado) {
+      var numero = parseFloat(combinado[1]);
+      return combinado[2] === "k" ? numero * 1000 : numero * 1000000;
+    }
+    var simples = Number(texto);
+    return isNaN(simples) ? 0 : simples;
+  }
+
   function debounce(fn, ms) {
     var temporizador;
     return function () {
@@ -230,10 +244,11 @@
       function campoNumero(chave, valor) {
         var td = el("td");
         var input = el("input");
-        input.type = "number";
+        input.type = "text";
         input.value = valor;
+        input.title = 'Aceita abreviações: "2k" = 2000';
         input.addEventListener("input", debounce(function () {
-          salvarNiveis(mutarNivel(i, chave, Number(input.value)));
+          salvarNiveis(mutarNivel(i, chave, parseNumeroAbreviado(input.value)));
         }, 500));
         td.appendChild(input);
         return td;
@@ -467,11 +482,11 @@
     var salvarGeral = debounce(function () {
       var corpo = {
         name: document.getElementById("admin-input-nome").value,
-        entryValue: Number(document.getElementById("admin-input-entry").value) || 0,
-        reentryValue: Number(document.getElementById("admin-input-reentry").value) || 0,
-        addonValue: Number(document.getElementById("admin-input-addon").value) || 0,
-        actionPrice: Number(document.getElementById("admin-input-preco").value) || 0,
-        dealerShare: Number(document.getElementById("admin-input-dealer").value) || 0,
+        entryValue: parseNumeroAbreviado(document.getElementById("admin-input-entry").value),
+        reentryValue: parseNumeroAbreviado(document.getElementById("admin-input-reentry").value),
+        addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
+        actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
+        dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
         chipValues: document.getElementById("admin-input-fichas").value,
       };
       Api.enviarAcao("/api/admin", "PATCH", corpo);

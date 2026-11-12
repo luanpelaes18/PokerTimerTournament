@@ -108,11 +108,11 @@
         <h3>Torneio</h3>
         <form class="form-grade" id="form-admin-geral">
           <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
-          <label class="campo">Fichas do buy-in<input type="number" id="admin-input-entry"></label>
-          <label class="campo">Fichas do rebuy<input type="number" id="admin-input-reentry"></label>
-          <label class="campo">Fichas do add-on<input type="number" id="admin-input-addon"></label>
-          <label class="campo">Preço por ação (R$)<input type="number" id="admin-input-preco" step="0.01"></label>
-          <label class="campo">Parte do dealer por ação (R$)<input type="number" id="admin-input-dealer" step="0.01"></label>
+          <label class="campo">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
+          <label class="campo">Fichas do rebuy<input type="text" inputmode="text" id="admin-input-reentry" placeholder="ex: 2k"></label>
+          <label class="campo">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
+          <label class="campo">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
+          <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
           <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
         </form>
         <button class="botao perigo" id="admin-botao-novo-torneio" type="button">Iniciar novo torneio</button>
