@@ -14,6 +14,17 @@ app = FastAPI(title="Poker Timer Tournament")
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+@app.middleware("http")
+async def sem_cache_em_estaticos(request, call_next):
+    # Em desenvolvimento os arquivos mudam o tempo todo; sem isso o navegador
+    # às vezes reaproveita uma versão antiga do HTML/CSS/JS mesmo com F5.
+    response = await call_next(request)
+    if request.url.path.startswith("/api") or request.url.path == "/ws":
+        return response
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 # ---------------------------------------------------------------- modelos --
 
 class NovoParticipante(BaseModel):

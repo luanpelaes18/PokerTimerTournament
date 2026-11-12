@@ -174,17 +174,7 @@ table.lista th { color: var(--texto-fraco); font-weight: 600; }
 }
 .campo-largo { grid-column: 1 / -1; }
 
-.linha-rascunho {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--borda);
-  border-radius: 10px;
-  margin-top: 8px;
-}
-.linha-rascunho .rotulo { display: block; font-size: 0.8rem; color: var(--texto-fraco); }
+.rotulo { color: var(--texto-fraco); font-size: 0.8rem; }
 
 .totais { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .totais div { background: var(--bg); border: 1px solid var(--borda); border-radius: 10px; padding: 10px 12px; }
@@ -192,6 +182,36 @@ table.lista th { color: var(--texto-fraco); font-weight: 600; }
 .totais .rotulo { color: var(--texto-fraco); font-size: 0.8rem; }
 
 .grade-admin { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+/* ---- Admin: lista à esquerda + detalhe à direita ---- */
+.admin-grade {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .admin-grade { grid-template-columns: 1fr; }
+}
+.admin-col-lista { max-height: 80vh; overflow-y: auto; }
+
+.linha-torneio {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  color: var(--texto);
+  font: inherit;
+}
+.linha-torneio:hover { border-color: var(--destaque); }
+.linha-torneio.selecionado { border-color: var(--destaque); background: var(--bg-elevado); }
+.linha-torneio .nome { font-weight: 600; display: block; }
+.linha-torneio .rotulo { display: block; margin-top: 2px; }
 
 table.niveis input { width: 72px; }
 table.niveis td, table.niveis th { text-align: center; }

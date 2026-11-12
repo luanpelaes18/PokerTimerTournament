@@ -12,17 +12,19 @@
   <!-- #menu -->
   <section id="tela-menu" class="tela">
     <div class="topo">
-      <h1 id="menu-nome-torneio">Poker Timer Tournament</h1>
+      <div>
+        <h1>Poker Timer Tournament</h1>
+        <p class="rotulo" id="menu-nome-torneio" style="margin:2px 0 0"></p>
+      </div>
       <div class="nav-telas">
         <span id="selo-conexao" class="selo-conexao">conectando…</span>
         <button class="botao" id="botao-tema" type="button">Tema</button>
       </div>
     </div>
     <div class="grade-menu">
-      <a class="cartao" href="#gerente">Gerente<span>Jogadores, rebuy, add-on e pagamentos</span></a>
+      <a class="cartao" href="#gerente">Gerente<span>Jogadores, timer, pagamentos e finalização</span></a>
       <a class="cartao" href="#timer">Timer<span>Relógio para a TV/monitor</span></a>
-      <a class="cartao" href="#admin">Admin<span>Estrutura, valores e controle total</span></a>
-      <a class="cartao" href="#historico">Histórico<span>Torneios anteriores</span></a>
+      <a class="cartao" href="#admin">Admin<span>Cadastro de torneios e histórico</span></a>
     </div>
   </section>
 
@@ -33,27 +35,45 @@
       <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
     </div>
 
-    <div class="cartao">
-      <div class="form-inline">
-        <label>Gerenciando: <select id="gerente-seletor-torneio"></select></label>
-        <button class="botao" id="gerente-botao-novo-rascunho" type="button">+ Rascunho</button>
-        <button class="botao primario" id="gerente-botao-ativar" type="button" style="display:none">Ativar este torneio</button>
+    <div class="admin-grade">
+      <div class="cartao admin-col-lista">
+        <div id="gerente-lista-torneios"></div>
       </div>
-      <div class="totais" id="gerente-totais"></div>
-      <button class="botao" id="gerente-botao-finalizar-torneio" type="button" style="margin-top:12px">Finalizar torneio</button>
-    </div>
 
-    <div class="cartao">
-      <form class="form-inline" id="form-novo-participante">
-        <input type="text" id="input-novo-participante" placeholder="Nome do jogador" required>
-        <button class="botao primario" type="submit">Adicionar</button>
-      </form>
-      <table class="lista">
-        <thead>
-          <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Valor devido</th><th>Pago</th><th>Status</th><th>Ações</th></tr>
-        </thead>
-        <tbody id="gerente-lista-jogadores"></tbody>
-      </table>
+      <div class="admin-col-detalhe">
+        <div class="cartao">
+          <button class="botao primario" id="gerente-botao-ativar" type="button" style="display:none; width:100%; margin-bottom:12px">Ativar este torneio</button>
+          <div class="totais" id="gerente-totais"></div>
+          <button class="botao" id="gerente-botao-finalizar-torneio" type="button" style="margin-top:12px">Finalizar torneio</button>
+        </div>
+
+        <div class="cartao">
+          <p class="timer-rotulo" id="gerente-rotulo-nivel">Nível 1</p>
+          <div class="timer-blinds" id="gerente-blinds" style="font-size:1.8rem">—</div>
+          <div class="timer-relogio" id="gerente-relogio" style="font-size:clamp(3rem,10vw,6rem)">00:00</div>
+          <div class="controles-timer">
+            <button class="botao" id="gerente-botao-prev" type="button">⏮ Anterior</button>
+            <button class="botao primario" id="gerente-botao-playpause" type="button">▶ Tocar</button>
+            <button class="botao" id="gerente-botao-next" type="button">Próximo ⏭</button>
+            <button class="botao" id="gerente-botao-menos1" type="button">-1 min</button>
+            <button class="botao" id="gerente-botao-mais1" type="button">+1 min</button>
+            <button class="botao" id="gerente-botao-mudo" type="button">🔈 Som</button>
+          </div>
+        </div>
+
+        <div class="cartao">
+          <form class="form-inline" id="form-novo-participante">
+            <input type="text" id="input-novo-participante" placeholder="Nome do jogador" required>
+            <button class="botao primario" type="submit">Adicionar</button>
+          </form>
+          <table class="lista">
+            <thead>
+              <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Valor devido</th><th>Pago</th><th>Status</th><th>Ações</th></tr>
+            </thead>
+            <tbody id="gerente-lista-jogadores"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -63,6 +83,8 @@
       <h1 id="timer-nome-torneio"></h1>
       <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
     </div>
+
+    <button class="botao primario" id="timer-botao-ativar-som" type="button" style="display:block; margin:16px auto; font-size:1.1rem; padding:14px 28px;">🔊 Toque aqui para ativar o som do alarme</button>
 
     <p class="timer-rotulo" id="timer-rotulo-nivel">Nível 1</p>
     <div class="timer-blinds" id="timer-blinds">—</div>
@@ -91,76 +113,44 @@
       <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
     </div>
 
-    <div class="cartao">
-      <div class="totais" id="admin-totais"></div>
-    </div>
-
-    <div class="cartao">
-      <p class="timer-rotulo" id="admin-rotulo-nivel">Nível 1</p>
-      <div class="timer-blinds" id="admin-blinds" style="font-size:1.6rem">—</div>
-      <div class="timer-relogio" id="admin-relogio" style="font-size:clamp(3rem,10vw,6rem)">00:00</div>
-      <div class="controles-timer">
-        <button class="botao" id="admin-botao-prev" type="button">⏮ Anterior</button>
-        <button class="botao primario" id="admin-botao-playpause" type="button">▶ Tocar</button>
-        <button class="botao" id="admin-botao-next" type="button">Próximo ⏭</button>
-        <button class="botao" id="admin-botao-menos1" type="button">-1 min</button>
-        <button class="botao" id="admin-botao-mais1" type="button">+1 min</button>
-        <button class="botao" id="admin-botao-mudo" type="button">🔈 Som</button>
+    <div class="admin-grade">
+      <div class="cartao admin-col-lista">
+        <button class="botao primario" id="admin-botao-novo-torneio" type="button" style="width:100%; margin-bottom:12px">+ Novo torneio</button>
+        <div id="admin-lista-torneios"></div>
       </div>
-    </div>
 
-    <div class="grade-admin">
-      <div class="cartao">
-        <div class="topo" style="margin-bottom:8px">
-          <h3 style="margin:0">Torneio</h3>
-          <span class="selo-conexao" id="admin-selo-configurado">não confirmado</span>
+      <div class="cartao admin-col-detalhe">
+        <div id="admin-detalhe-vazio">
+          <p class="rotulo">Selecione um torneio à esquerda, ou crie um novo para começar o cadastro.</p>
         </div>
-        <form class="form-grade" id="form-admin-geral">
-          <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
-          <label class="campo">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
-          <label class="campo">Fichas do rebuy<input type="text" inputmode="text" id="admin-input-reentry" placeholder="ex: 2k"></label>
-          <label class="campo">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
-          <label class="campo">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
-          <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
-          <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
-        </form>
-        <button class="botao primario" id="admin-botao-confirmar" type="button">Confirmar e salvar configuração</button>
-        <button class="botao" id="admin-botao-finalizar-torneio" type="button">Finalizar torneio</button>
-        <button class="botao perigo" id="admin-botao-novo-torneio" type="button">Iniciar novo torneio</button>
 
-        <h3 style="margin-top:20px">Torneios salvos (não iniciados/finalizados)</h3>
-        <div class="form-inline">
-          <label>Gerenciando: <select id="admin-seletor-torneio"></select></label>
-          <button class="botao" id="admin-botao-novo-rascunho" type="button">+ Rascunho</button>
-          <button class="botao primario" id="admin-botao-ativar" type="button" style="display:none">Ativar este torneio</button>
+        <div id="admin-detalhe-editar" style="display:none">
+          <div class="topo" style="margin-bottom:8px">
+            <h3 style="margin:0" id="admin-detalhe-titulo">Torneio</h3>
+            <span class="selo-conexao" id="admin-selo-configurado">não salvo</span>
+          </div>
+          <form class="form-grade" id="form-admin-geral">
+            <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
+            <label class="campo">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
+            <label class="campo">Fichas do rebuy<input type="text" inputmode="text" id="admin-input-reentry" placeholder="ex: 2k"></label>
+            <label class="campo">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
+            <label class="campo">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
+            <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
+            <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
+          </form>
+          <button class="botao primario" id="admin-botao-salvar" type="button">Salvar</button>
+
+          <h3 style="margin-top:20px">Estrutura de níveis</h3>
+          <table class="lista niveis">
+            <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Tempo</th><th>Pausa</th><th>Fecha entradas</th><th></th></tr></thead>
+            <tbody id="admin-lista-niveis"></tbody>
+          </table>
+          <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
         </div>
-        <div id="admin-lista-rascunhos"></div>
-      </div>
 
-      <div class="cartao">
-        <h3>Estrutura de níveis</h3>
-        <table class="lista niveis">
-          <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Min</th><th>Pausa</th><th>Fecha entradas</th><th></th></tr></thead>
-          <tbody id="admin-lista-niveis"></tbody>
-        </table>
-        <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
+        <div id="admin-detalhe-relatorio" style="display:none"></div>
       </div>
     </div>
-  </section>
-
-  <!-- #historico -->
-  <section id="tela-historico" class="tela">
-    <div class="topo">
-      <h1>Histórico de torneios</h1>
-      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
-    </div>
-    <div class="cartao">
-      <table class="lista">
-        <thead><tr><th>Torneio</th><th>Status</th><th>Criado em</th><th></th></tr></thead>
-        <tbody id="historico-lista"></tbody>
-      </table>
-    </div>
-    <div class="cartao" id="historico-relatorio" style="display:none"></div>
   </section>
 
   <!-- #offline -->

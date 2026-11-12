@@ -4,7 +4,16 @@
   function obterContexto() {
     if (!ctx) {
       var AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) ctx = new AC();
+      if (!AC) {
+        console.warn("Web Audio API não suportada neste navegador.");
+        return null;
+      }
+      try {
+        ctx = new AC();
+      } catch (e) {
+        console.error("Falha ao criar AudioContext:", e);
+        return null;
+      }
     }
     return ctx;
   }
@@ -24,14 +33,14 @@
     osc.stop(t0 + duracaoSeg);
   }
 
-  // Dois tons alternados, como um bipe de forno/alarme.
+  // Troca de nível: "Pii ... piiii ... piiiiiiiiiiiiiii" — mesmo tom, cada bipe
+  // mais longo que o anterior, com a pausa entre eles também crescendo.
   function bipar(mudo) {
     if (mudo) return;
-    tocarTom(880, 0, 0.15);
-    tocarTom(660, 0.2, 0.15);
-    tocarTom(880, 0.4, 0.15);
-    tocarTom(660, 0.6, 0.15);
-    if (navigator.vibrate) navigator.vibrate([150, 80, 150, 80, 150]);
+    tocarTom(880, 0, 0.1);
+    tocarTom(880, 0.4, 0.5);
+    tocarTom(880, 1.3, 1.2);
+    if (navigator.vibrate) navigator.vibrate([100, 300, 500, 400, 1200]);
   }
 
   // Alerta mais curto para o aviso de 30 segundos.

@@ -37,15 +37,6 @@
     return isNaN(simples) ? 0 : simples;
   }
 
-  function debounce(fn, ms) {
-    var temporizador;
-    return function () {
-      var args = arguments;
-      clearTimeout(temporizador);
-      temporizador = setTimeout(function () { fn.apply(null, args); }, ms);
-    };
-  }
-
   function el(tag, classe, texto) {
     var e = document.createElement(tag);
     if (classe) e.className = classe;
@@ -53,17 +44,42 @@
     return e;
   }
 
-  // --------------------------------------------------- rascunhos de torneio --
-  // Gerente/Admin podem visualizar e editar um torneio diferente do que está
-  // "ao vivo" (ex: preparar a estrutura do próximo jogo com antecedência).
+  function lerStorage(chave) {
+    try { return localStorage.getItem(chave); } catch (e) { return null; }
+  }
+
+  function gravarStorage(chave, valor) {
+    try {
+      if (valor) localStorage.setItem(chave, valor);
+      else localStorage.removeItem(chave);
+    } catch (e) { /* sem storage */ }
+  }
+
+  var ROTULOS_EVENTO = {
+    torneio_criado: "Torneio criado",
+    torneio_finalizado: "Torneio finalizado",
+    entrada: "Entrada",
+    rebuy: "Rebuy",
+    addon: "Add-on",
+    reentrada: "Reentrada",
+    saida: "Saída (eliminado)",
+    removido: "Removido",
+  };
+
+  function fmtEvento(ev) {
+    var rotulo = ROTULOS_EVENTO[ev.type] || ev.type;
+    return ev.detail ? (rotulo + ": " + ev.detail) : rotulo;
+  }
+
+  // --------------------------------------------------- torneio ao vivo (Gerente) --
+  // No Gerente dá pra escolher um torneio salvo diferente do que está "ao vivo"
+  // (ex: conferir/ajustar jogadores de um torneio preparado com antecedência).
   // Só o torneio atual (torneioSelecionadoId === null ou igual ao id ao vivo)
   // tem os controles de timer liberados — "só um pode ser tocado".
 
   var torneioSelecionadoId = null; // null = segue o torneio atual
   var estadoRascunho = null;
-  var SELETORES_TORNEIO = ["gerente-seletor-torneio", "admin-seletor-torneio"];
-  var BOTOES_ATIVAR = ["gerente-botao-ativar", "admin-botao-ativar"];
-  var BOTOES_NOVO_RASCUNHO = ["gerente-botao-novo-rascunho", "admin-botao-novo-rascunho"];
+  var BOTOES_ATIVAR = ["gerente-botao-ativar"];
 
   function emModoRascunho() {
     var atual = Api.obterEstado();
@@ -87,7 +103,6 @@
       .then(function (novo) {
         estadoRascunho = novo;
         renderizarGerente(novo);
-        renderizarAdmin(novo);
         atualizarBotaoAtivar();
         return novo;
       })
@@ -101,57 +116,35 @@
       var b = document.getElementById(id);
       if (b) b.style.display = mostrar ? "" : "none";
     });
-    // Finalizar/Iniciar novo torneio sempre agem no torneio ao vivo — travar enquanto
-    // se está olhando um rascunho evita finalizar o torneio errado sem querer.
-    ["gerente-botao-finalizar-torneio", "admin-botao-finalizar-torneio", "admin-botao-novo-torneio"].forEach(function (id) {
-      var b = document.getElementById(id);
-      if (b) {
-        b.disabled = rascunho;
-        b.title = rascunho ? "Selecione o torneio atual para usar este controle" : "";
-      }
-    });
+    // Finalizar sempre age no torneio ao vivo — travar enquanto se está olhando
+    // um rascunho evita finalizar o torneio errado sem querer.
+    var botaoFinalizar = document.getElementById("gerente-botao-finalizar-torneio");
+    if (botaoFinalizar) {
+      botaoFinalizar.disabled = rascunho;
+      botaoFinalizar.title = rascunho ? "Selecione o torneio atual para usar este controle" : "";
+    }
   }
 
-  function popularSeletores(lista) {
-    var atual = Api.obterEstado();
-    var idAtual = atual ? atual.tournament.id : null;
-    SELETORES_TORNEIO.forEach(function (idSel) {
-      var sel = document.getElementById(idSel);
-      if (!sel || document.activeElement === sel) return;
-      sel.textContent = "";
-      lista.forEach(function (t) {
-        var opt = document.createElement("option");
-        opt.value = t.id;
-        opt.textContent = t.name + (t.id === idAtual ? " (atual)" : "") + " — " + t.status;
-        sel.appendChild(opt);
-      });
-      sel.value = torneioSelecionadoId || idAtual || "";
-    });
-    renderizarListaRascunhos(lista);
-  }
-
-  function renderizarListaRascunhos(lista) {
-    var container = document.getElementById("admin-lista-rascunhos");
+  function renderizarListaGerente(lista) {
+    var container = document.getElementById("gerente-lista-torneios");
     if (!container) return;
     var atual = Api.obterEstado();
     var idAtual = atual ? atual.tournament.id : null;
-    var rascunhos = lista.filter(function (t) { return t.status !== "finished" && t.id !== idAtual; });
+    var idSelecionado = torneioSelecionadoId || idAtual;
+    // Gerente só trabalha com torneios ainda não finalizados — ver histórico é tarefa do Admin.
+    var disponiveis = lista.filter(function (t) { return t.status !== "finished"; });
 
     container.textContent = "";
-    if (!rascunhos.length) {
-      container.appendChild(el("p", "rotulo", "Nenhum torneio salvo e não iniciado."));
+    if (!disponiveis.length) {
+      container.appendChild(el("p", "rotulo", "Nenhum torneio disponível. Cadastre um no Admin."));
       return;
     }
-    rascunhos.forEach(function (t) {
-      var linha = el("div", "linha-rascunho");
-      var info = el("div");
-      info.appendChild(el("strong", null, t.name));
-      info.appendChild(el("span", "rotulo", "criado em " + new Date(t.created_at).toLocaleString("pt-BR")));
-      var botao = el("button", "botao", "Gerenciar");
-      botao.type = "button";
-      botao.addEventListener("click", function () { selecionarTorneio(t.id); });
-      linha.appendChild(info);
-      linha.appendChild(botao);
+    disponiveis.forEach(function (t) {
+      var linha = el("button", "linha-torneio" + (t.id === idSelecionado ? " selecionado" : ""));
+      linha.type = "button";
+      linha.appendChild(el("span", "nome", t.name + (t.id === idAtual ? " (atual)" : "")));
+      linha.appendChild(el("span", "rotulo", t.status));
+      linha.addEventListener("click", function () { selecionarTorneio(t.id === idAtual ? null : t.id); });
       container.appendChild(linha);
     });
   }
@@ -161,55 +154,47 @@
   }
 
   function atualizarListaTorneios() {
-    carregarListaTorneios().then(popularSeletores);
+    carregarListaTorneios().then(renderizarListaGerente);
+  }
+
+  var gerenteRestaurado = false;
+
+  // Ao entrar no Gerente pela primeira vez na sessão, tenta reabrir o torneio
+  // (se diferente do atual) que estava selecionado antes de recarregar a página.
+  function entrarGerente() {
+    if (gerenteRestaurado) { atualizarListaTorneios(); return; }
+    gerenteRestaurado = true;
+    var salvo = lerStorage("gerenteTorneioId");
+    if (!salvo) { atualizarListaTorneios(); return; }
+    carregarListaTorneios().then(function (lista) {
+      renderizarListaGerente(lista);
+      var achado = lista.some(function (t) { return t.id === salvo; });
+      if (achado) selecionarTorneio(salvo);
+      else gravarStorage("gerenteTorneioId", null);
+    });
   }
 
   function selecionarTorneio(id) {
     torneioSelecionadoId = id || null;
-    SELETORES_TORNEIO.forEach(function (sel) {
-      var el2 = document.getElementById(sel);
-      if (el2) el2.value = torneioSelecionadoId || "";
-    });
+    gravarStorage("gerenteTorneioId", torneioSelecionadoId);
+    atualizarListaTorneios(); // reflete o destaque de selecionado na lista
     if (emModoRascunho()) {
       fetch("/api/state?tournament_id=" + encodeURIComponent(torneioSelecionadoId))
         .then(function (r) { return r.json(); })
         .then(function (novo) {
           estadoRascunho = novo;
           renderizarGerente(novo);
-          renderizarAdmin(novo);
           atualizarBotaoAtivar();
         });
     } else {
       estadoRascunho = null;
       var atual = Api.obterEstado();
-      if (atual) { renderizarGerente(atual); renderizarAdmin(atual); }
+      if (atual) renderizarGerente(atual);
       atualizarBotaoAtivar();
     }
   }
 
   function wireSeletorTorneio() {
-    SELETORES_TORNEIO.forEach(function (idSel) {
-      var sel = document.getElementById(idSel);
-      if (sel) sel.addEventListener("change", function () { selecionarTorneio(sel.value); });
-    });
-    BOTOES_NOVO_RASCUNHO.forEach(function (idBotao) {
-      var botao = document.getElementById(idBotao);
-      if (!botao) return;
-      botao.addEventListener("click", function () {
-        var nome = prompt("Nome do novo rascunho de torneio:", "Próximo Home Game");
-        if (!nome) return;
-        fetch("/api/tournaments", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: nome }),
-        })
-          .then(function (r) { return r.json(); })
-          .then(function (novo) {
-            atualizarListaTorneios();
-            selecionarTorneio(novo.tournament.id);
-          });
-      });
-    });
     BOTOES_ATIVAR.forEach(function (idBotao) {
       var botao = document.getElementById(idBotao);
       if (!botao) return;
@@ -227,6 +212,292 @@
     });
   }
 
+  // ------------------------------------------------------- Admin: cadastro --
+  // Tela separada do torneio "ao vivo": lista à esquerda com todos os torneios
+  // (qualquer status), clicar abre o cadastro (editável) ou o relatório
+  // (se já finalizado) à direita. Sem WebSocket aqui — é só cadastro.
+
+  var adminTorneioId = null;
+  var adminEstado = null;
+  var adminRestaurado = false;
+
+  function atualizarListaAdmin() {
+    carregarListaTorneios().then(renderizarListaAdminTorneios);
+  }
+
+  // Ao entrar no Admin pela primeira vez na sessão, tenta reabrir o torneio
+  // que estava selecionado antes de recarregar a página.
+  function entrarAdmin() {
+    if (adminRestaurado) { atualizarListaAdmin(); return; }
+    adminRestaurado = true;
+    var salvo = lerStorage("adminTorneioId");
+    if (!salvo) { atualizarListaAdmin(); return; }
+    carregarListaTorneios().then(function (lista) {
+      renderizarListaAdminTorneios(lista);
+      var achado = lista.filter(function (t) { return t.id === salvo; })[0];
+      if (achado) selecionarAdminTorneio(achado.id, achado.status);
+      else gravarStorage("adminTorneioId", null);
+    });
+  }
+
+  function renderizarListaAdminTorneios(lista) {
+    var container = document.getElementById("admin-lista-torneios");
+    if (!container) return;
+    container.textContent = "";
+    if (!lista.length) {
+      container.appendChild(el("p", "rotulo", "Nenhum torneio cadastrado ainda."));
+      return;
+    }
+    lista.forEach(function (t) {
+      var linha = el("button", "linha-torneio" + (t.id === adminTorneioId ? " selecionado" : ""));
+      linha.type = "button";
+      linha.appendChild(el("span", "nome", t.name + (t.status === "finished" ? " (finalizado)" : "")));
+      linha.appendChild(el("span", "rotulo", t.status + " — " + new Date(t.created_at).toLocaleDateString("pt-BR")));
+      linha.addEventListener("click", function () { selecionarAdminTorneio(t.id, t.status); });
+      container.appendChild(linha);
+    });
+  }
+
+  function selecionarAdminTorneio(id, status) {
+    adminTorneioId = id;
+    gravarStorage("adminTorneioId", id);
+    atualizarListaAdmin();
+    if (status === "finished") {
+      fetch("/api/tournaments/" + id)
+        .then(function (r) { return r.json(); })
+        .then(renderizarRelatorioAdmin);
+    } else {
+      fetch("/api/state?tournament_id=" + encodeURIComponent(id))
+        .then(function (r) { return r.json(); })
+        .then(function (novo) {
+          adminEstado = novo;
+          renderizarFormAdmin(novo);
+        });
+    }
+  }
+
+  function mostrarPainelAdmin(nomePainel) {
+    ["admin-detalhe-vazio", "admin-detalhe-editar", "admin-detalhe-relatorio"].forEach(function (id) {
+      var painel = document.getElementById(id);
+      if (painel) painel.style.display = id === nomePainel ? "block" : "none";
+    });
+  }
+
+  var CAMPOS_ADMIN = {
+    "admin-input-nome": "name",
+    "admin-input-entry": "entryValue",
+    "admin-input-reentry": "reentryValue",
+    "admin-input-addon": "addonValue",
+    "admin-input-preco": "actionPrice",
+    "admin-input-dealer": "dealerShare",
+    "admin-input-fichas": "chipValues",
+  };
+
+  function renderizarFormAdmin(estado, forcar) {
+    mostrarPainelAdmin("admin-detalhe-editar");
+    document.getElementById("admin-detalhe-titulo").textContent = estado.tournament.name || "Torneio";
+
+    Object.keys(CAMPOS_ADMIN).forEach(function (idCampo) {
+      var input = document.getElementById(idCampo);
+      if (!input || (!forcar && document.activeElement === input)) return; // não sobrescreve o que o usuário está digitando
+      var valor = estado.tournament[CAMPOS_ADMIN[idCampo]];
+      input.value = valor === undefined || valor === null ? "" : valor;
+    });
+
+    var selo = document.getElementById("admin-selo-configurado");
+    selo.textContent = estado.tournament.configured ? "salvo ✓" : "não salvo";
+    selo.className = "selo-conexao " + (estado.tournament.configured ? "online" : "offline");
+
+    renderizarNiveisAdmin(estado.tournament.levels, forcar);
+  }
+
+  function renderizarRelatorioAdmin(rel) {
+    mostrarPainelAdmin("admin-detalhe-relatorio");
+    var caixa = document.getElementById("admin-detalhe-relatorio");
+    caixa.textContent = "";
+    caixa.appendChild(el("h3", null, rel.name));
+    caixa.appendChild(el("p", "rotulo", "Finalizado em " + (rel.finishedAt ? new Date(rel.finishedAt).toLocaleString("pt-BR") : "—")));
+    caixa.appendChild(el("p", null, "Prêmio: " + fmtMoeda(rel.totals.prizePool) + " · Dealer: " + fmtMoeda(rel.totals.dealerTotal)));
+
+    var tabela = el("table", "lista");
+    var thead = el("thead");
+    var trh = el("tr");
+    ["Jogador", "Rebuys", "Add-on", "Pago", "Eliminado"].forEach(function (titulo) { trh.appendChild(el("th", null, titulo)); });
+    thead.appendChild(trh);
+    tabela.appendChild(thead);
+    var tbody = el("tbody");
+    rel.participants.forEach(function (p) {
+      var tr = el("tr");
+      tr.appendChild(el("td", null, p.name));
+      tr.appendChild(el("td", null, String(p.rebuys)));
+      tr.appendChild(el("td", null, p.addon ? "sim" : "não"));
+      tr.appendChild(el("td", null, p.paid ? "sim" : "não"));
+      tr.appendChild(el("td", null, p.eliminated ? "sim" : "não"));
+      tbody.appendChild(tr);
+    });
+    tabela.appendChild(tbody);
+    caixa.appendChild(tabela);
+
+    caixa.appendChild(el("h3", null, "Linha do tempo"));
+    if (!rel.events || !rel.events.length) {
+      caixa.appendChild(el("p", "rotulo", "Sem eventos registrados."));
+    } else {
+      var listaEventos = el("ul", "tags");
+      listaEventos.style.flexDirection = "column";
+      listaEventos.style.alignItems = "flex-start";
+      listaEventos.style.gap = "6px";
+      rel.events.forEach(function (ev) {
+        var hora = new Date(ev.createdAt).toLocaleString("pt-BR");
+        listaEventos.appendChild(el("li", null, hora + " — " + fmtEvento(ev)));
+      });
+      caixa.appendChild(listaEventos);
+    }
+  }
+
+  function renderizarNiveisAdmin(levels, forcar) {
+    var tbody = document.getElementById("admin-lista-niveis");
+    if (!forcar && document.activeElement && tbody.contains(document.activeElement)) return; // evita piscar enquanto edita
+    tbody.textContent = "";
+    levels.forEach(function (nivel, i) {
+      var tr = document.createElement("tr");
+
+      function campoNumero(chave, rotulo, valor) {
+        var td = el("td");
+        var input = el("input");
+        input.type = "text";
+        input.value = valor;
+        input.title = 'Aceita abreviações: "2k" = 2000. Salva ao sair do campo (clique fora ou Enter).';
+        // Só salva ao sair do campo (change), não a cada tecla — assim dá pra digitar
+        // números com mais de um dígito sem disparar a confirmação antes de terminar.
+        input.addEventListener("change", function () {
+          var novoValor = parseNumeroAbreviado(input.value);
+          var haProximos = i < adminEstado.tournament.levels.length - 1;
+          var aplicarProximos = haProximos && confirm(
+            "Aplicar " + rotulo + " = " + novoValor + " também aos próximos níveis?\n\n" +
+            "OK = aplica a este e a todos os níveis seguintes.\n" +
+            "Cancelar = altera só este nível."
+          );
+          salvarNiveisAdmin(mutarNivelAdmin(i, chave, novoValor, aplicarProximos));
+        });
+        input.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") input.blur();
+        });
+        td.appendChild(input);
+        return td;
+      }
+
+      tr.appendChild(el("td", null, String(i + 1)));
+      tr.appendChild(campoNumero("sb", "SB", nivel.sb));
+      tr.appendChild(campoNumero("bb", "BB", nivel.bb));
+      tr.appendChild(campoNumero("ante", "Ante", nivel.ante || 0));
+      tr.appendChild(campoNumero("minutes", "Tempo", nivel.minutes));
+
+      var tdPausa = el("td");
+      var checkPausa = el("input");
+      checkPausa.type = "checkbox";
+      checkPausa.checked = !!nivel.isBreak;
+      checkPausa.addEventListener("change", function () {
+        salvarNiveisAdmin(mutarNivelAdmin(i, "isBreak", checkPausa.checked));
+      });
+      tdPausa.appendChild(checkPausa);
+      tr.appendChild(tdPausa);
+
+      var tdFechaEntradas = el("td");
+      var checkFechaEntradas = el("input");
+      checkFechaEntradas.type = "checkbox";
+      checkFechaEntradas.checked = !!nivel.closesEntries;
+      checkFechaEntradas.title = "A partir deste nível, não é mais possível fazer reentrada";
+      checkFechaEntradas.addEventListener("change", function () {
+        salvarNiveisAdmin(mutarNivelAdmin(i, "closesEntries", checkFechaEntradas.checked));
+      });
+      tdFechaEntradas.appendChild(checkFechaEntradas);
+      tr.appendChild(tdFechaEntradas);
+
+      var tdRemover = el("td");
+      var botaoRemover = el("button", "botao perigo", "x");
+      botaoRemover.type = "button";
+      botaoRemover.addEventListener("click", function () {
+        var novosNiveis = adminEstado.tournament.levels.filter(function (_, idx) { return idx !== i; });
+        salvarNiveisAdmin(novosNiveis);
+      });
+      tdRemover.appendChild(botaoRemover);
+      tr.appendChild(tdRemover);
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function mutarNivelAdmin(indice, chave, valor, aplicarProximos) {
+    return adminEstado.tournament.levels.map(function (n, idx) {
+      if (idx !== indice && !(aplicarProximos && idx > indice)) return n;
+      var copia = Object.assign({}, n);
+      copia[chave] = valor;
+      return copia;
+    });
+  }
+
+  function salvarAdmin(corpoParcial) {
+    var corpo = Object.assign({ tournamentId: adminTorneioId }, corpoParcial);
+    return fetch("/api/admin", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    })
+      .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+      .then(function (novo) {
+        adminEstado = novo;
+        renderizarFormAdmin(novo, true); // força a atualização mesmo com o campo recém-editado ainda em foco
+        atualizarListaAdmin();
+        return novo;
+      })
+      .catch(function () { Api.avisar("Não foi possível salvar. Tente novamente."); });
+  }
+
+  function salvarNiveisAdmin(novosNiveis) {
+    salvarAdmin({ levels: novosNiveis });
+  }
+
+  function lerCamposGeraisAdmin() {
+    return {
+      name: document.getElementById("admin-input-nome").value,
+      entryValue: parseNumeroAbreviado(document.getElementById("admin-input-entry").value),
+      reentryValue: parseNumeroAbreviado(document.getElementById("admin-input-reentry").value),
+      addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
+      actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
+      dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
+      chipValues: document.getElementById("admin-input-fichas").value,
+    };
+  }
+
+  function wireAdminPainel() {
+    document.getElementById("admin-botao-novo-torneio").addEventListener("click", function () {
+      var nome = prompt("Nome do novo torneio:", "Home Game");
+      if (!nome) return;
+      fetch("/api/tournaments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nome }),
+      })
+        .then(function (r) { return r.json(); })
+        .then(function (novo) {
+          adminEstado = novo;
+          atualizarListaAdmin();
+          selecionarAdminTorneio(novo.tournament.id, novo.tournament.status);
+        });
+    });
+
+    document.getElementById("admin-botao-salvar").addEventListener("click", function () {
+      var corpo = lerCamposGeraisAdmin();
+      corpo.configured = true;
+      salvarAdmin(corpo);
+    });
+
+    document.getElementById("admin-botao-add-nivel").addEventListener("click", function () {
+      var novosNiveis = adminEstado.tournament.levels.concat([{ sb: 0, bb: 0, ante: 0, minutes: 10, isBreak: false }]);
+      salvarNiveisAdmin(novosNiveis);
+    });
+  }
+
   // ------------------------------------------------------------- roteador --
 
   var statusConexaoAtual = "conectando";
@@ -238,10 +509,10 @@
     var secao = document.getElementById("tela-" + alvo);
     if (secao) secao.classList.add("ativa");
     else document.getElementById("tela-menu").classList.add("ativa");
-    if (alvo === "historico") carregarHistorico();
-    if (alvo === "gerente" || alvo === "admin") atualizarListaTorneios();
-    // O alarme sonoro só deve tocar na tela que está de fato visível para quem joga —
-    // sem isso, toda aba aberta (Admin, Gerente, abas esquecidas) tocaria junto e fora de sincronia.
+    if (alvo === "gerente") entrarGerente();
+    if (alvo === "admin") entrarAdmin();
+    // O alarme sonoro só deve tocar em quem está olhando o relógio (Timer/Gerente) —
+    // sem isso, toda aba aberta tocaria junto e fora de sincronia.
     window.ROTA_ATUAL = alvo;
   }
 
@@ -386,118 +657,8 @@
     document.getElementById("timer-stack-medio").textContent = fmtNumero(estado.totals.avgStack);
   }
 
-  var CAMPOS_ADMIN = {
-    "admin-input-nome": "name",
-    "admin-input-entry": "entryValue",
-    "admin-input-reentry": "reentryValue",
-    "admin-input-addon": "addonValue",
-    "admin-input-preco": "actionPrice",
-    "admin-input-dealer": "dealerShare",
-    "admin-input-fichas": "chipValues",
-  };
-
-  function renderizarAdmin(estado) {
-    renderizarTotais("admin-totais", estado.tournament, estado.totals, true);
-
-    Object.keys(CAMPOS_ADMIN).forEach(function (idCampo) {
-      var input = document.getElementById(idCampo);
-      if (!input || document.activeElement === input) return; // não sobrescreve o que o usuário está digitando
-      var valor = estado.tournament[CAMPOS_ADMIN[idCampo]];
-      input.value = valor === undefined || valor === null ? "" : valor;
-    });
-
-    var botaoMudo = document.getElementById("admin-botao-mudo");
-    botaoMudo.textContent = estado.tournament.muted ? "🔇 Mudo" : "🔈 Som";
-
-    var seloConfigurado = document.getElementById("admin-selo-configurado");
-    seloConfigurado.textContent = estado.tournament.configured ? "configurado ✓" : "não confirmado";
-    seloConfigurado.className = "selo-conexao " + (estado.tournament.configured ? "online" : "offline");
-
-    renderizarNiveis(estado.tournament.levels);
-  }
-
-  function renderizarNiveis(levels) {
-    var tbody = document.getElementById("admin-lista-niveis");
-    if (document.activeElement && tbody.contains(document.activeElement)) return; // evita piscar enquanto edita
-    tbody.textContent = "";
-    levels.forEach(function (nivel, i) {
-      var tr = document.createElement("tr");
-
-      function campoNumero(chave, valor) {
-        var td = el("td");
-        var input = el("input");
-        input.type = "text";
-        input.value = valor;
-        input.title = 'Aceita abreviações: "2k" = 2000';
-        input.addEventListener("input", debounce(function () {
-          salvarNiveis(mutarNivel(i, chave, parseNumeroAbreviado(input.value)));
-        }, 500));
-        td.appendChild(input);
-        return td;
-      }
-
-      tr.appendChild(el("td", null, String(i + 1)));
-      tr.appendChild(campoNumero("sb", nivel.sb));
-      tr.appendChild(campoNumero("bb", nivel.bb));
-      tr.appendChild(campoNumero("ante", nivel.ante || 0));
-      tr.appendChild(campoNumero("minutes", nivel.minutes));
-
-      var tdPausa = el("td");
-      var checkPausa = el("input");
-      checkPausa.type = "checkbox";
-      checkPausa.checked = !!nivel.isBreak;
-      checkPausa.addEventListener("change", function () {
-        salvarNiveis(mutarNivel(i, "isBreak", checkPausa.checked));
-      });
-      tdPausa.appendChild(checkPausa);
-      tr.appendChild(tdPausa);
-
-      var tdFechaEntradas = el("td");
-      var checkFechaEntradas = el("input");
-      checkFechaEntradas.type = "checkbox";
-      checkFechaEntradas.checked = !!nivel.closesEntries;
-      checkFechaEntradas.title = "A partir deste nível, não é mais possível fazer reentrada";
-      checkFechaEntradas.addEventListener("change", function () {
-        salvarNiveis(mutarNivel(i, "closesEntries", checkFechaEntradas.checked));
-      });
-      tdFechaEntradas.appendChild(checkFechaEntradas);
-      tr.appendChild(tdFechaEntradas);
-
-      var tdRemover = el("td");
-      var botaoRemover = el("button", "botao perigo", "x");
-      botaoRemover.type = "button";
-      botaoRemover.addEventListener("click", function () {
-        var estado = estadoExibido();
-        var novosNiveis = estado.tournament.levels.filter(function (_, idx) { return idx !== i; });
-        salvarNiveisDireto(novosNiveis);
-      });
-      tdRemover.appendChild(botaoRemover);
-      tr.appendChild(tdRemover);
-
-      tbody.appendChild(tr);
-    });
-  }
-
-  function mutarNivel(indice, chave, valor) {
-    var estado = estadoExibido();
-    var novosNiveis = estado.tournament.levels.map(function (n, idx) {
-      if (idx !== indice) return n;
-      var copia = Object.assign({}, n);
-      copia[chave] = valor;
-      return copia;
-    });
-    return novosNiveis;
-  }
-
-  var salvarNiveisDireto = function (novosNiveis) {
-    executarAcao("/api/admin", "PATCH", { levels: novosNiveis }, function (rascunho) {
-      rascunho.tournament.levels = novosNiveis;
-    });
-  };
-  var salvarNiveis = salvarNiveisDireto;
-
   function renderizarMenu(estado) {
-    document.getElementById("menu-nome-torneio").textContent = estado.tournament.name;
+    document.getElementById("menu-nome-torneio").textContent = "Torneio atual: " + estado.tournament.name;
   }
 
   window.renderizarRelogio = function (estado, restante) {
@@ -507,16 +668,16 @@
     var textoRelogio = fmtMMSS(restante);
     var alerta = restante <= 30;
 
-    ["timer-relogio", "admin-relogio"].forEach(function (id) {
+    ["timer-relogio", "gerente-relogio"].forEach(function (id) {
       var elRelogio = document.getElementById(id);
       if (elRelogio) { elRelogio.textContent = textoRelogio; elRelogio.classList.toggle("alerta", alerta); }
     });
-    ["timer-blinds", "admin-blinds"].forEach(function (id) {
+    ["timer-blinds", "gerente-blinds"].forEach(function (id) {
       var elBlind = document.getElementById(id);
       if (elBlind) elBlind.textContent = fmtBlind(nivel);
     });
     var rotulo = "Nível " + (torneio.currentLevelIndex + 1) + " de " + torneio.levels.length;
-    ["timer-rotulo-nivel", "admin-rotulo-nivel"].forEach(function (id) {
+    ["timer-rotulo-nivel", "gerente-rotulo-nivel"].forEach(function (id) {
       var elRotulo = document.getElementById(id);
       if (elRotulo) elRotulo.textContent = rotulo;
     });
@@ -526,17 +687,17 @@
     var emRascunho = emModoRascunho();
     var tituloRascunho = "Selecione o torneio atual (não um rascunho) para controlar o timer";
 
-    ["timer-botao-playpause", "admin-botao-playpause"].forEach(function (id) {
+    ["timer-botao-playpause", "gerente-botao-playpause"].forEach(function (id) {
       var botao = document.getElementById(id);
       if (!botao) return;
       botao.textContent = torneio.status === "running" ? "⏸ Pausar" : "▶ Tocar";
-      var bloqueadoRascunho = id.indexOf("admin-") === 0 && emRascunho;
+      var bloqueadoRascunho = id.indexOf("gerente-") === 0 && emRascunho;
       var bloqueado = bloqueadoRascunho || (!torneio.configured && torneio.status !== "running");
       botao.disabled = bloqueado;
       botao.title = bloqueadoRascunho ? tituloRascunho : (bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "");
     });
 
-    ["admin-botao-prev", "admin-botao-next", "admin-botao-mais1", "admin-botao-menos1"].forEach(function (id) {
+    ["gerente-botao-prev", "gerente-botao-next", "gerente-botao-mais1", "gerente-botao-menos1"].forEach(function (id) {
       var botao = document.getElementById(id);
       if (!botao) return;
       botao.disabled = emRascunho;
@@ -547,10 +708,7 @@
   function renderTudo(estado) {
     renderizarMenu(estado);
     renderizarTimerEstatico(estado);
-    if (!emModoRascunho()) {
-      renderizarGerente(estado);
-      renderizarAdmin(estado);
-    }
+    if (!emModoRascunho()) renderizarGerente(estado);
   }
 
   // ---------------------------------------------------------------- conexão --
@@ -563,91 +721,6 @@
       selo.textContent = status === "online" ? "online" : status === "offline" ? "sem conexão" : "conectando…";
     }
     aplicarRota();
-  }
-
-  // --------------------------------------------------------------- histórico --
-
-  function carregarHistorico() {
-    fetch("/api/tournaments")
-      .then(function (r) { return r.json(); })
-      .then(function (lista) {
-        var tbody = document.getElementById("historico-lista");
-        tbody.textContent = "";
-        lista.forEach(function (t) {
-          var tr = document.createElement("tr");
-          tr.appendChild(el("td", null, t.name));
-          tr.appendChild(el("td", null, t.status));
-          tr.appendChild(el("td", null, new Date(t.created_at).toLocaleString("pt-BR")));
-          var tdBotao = el("td");
-          var botao = el("button", "botao", "Ver relatório");
-          botao.type = "button";
-          botao.addEventListener("click", function () { mostrarRelatorio(t.id); });
-          tdBotao.appendChild(botao);
-          tr.appendChild(tdBotao);
-          tbody.appendChild(tr);
-        });
-      });
-  }
-
-  function mostrarRelatorio(id) {
-    fetch("/api/tournaments/" + id)
-      .then(function (r) { return r.json(); })
-      .then(function (rel) {
-        var caixa = document.getElementById("historico-relatorio");
-        caixa.style.display = "block";
-        caixa.textContent = "";
-        caixa.appendChild(el("h3", null, rel.name));
-        caixa.appendChild(el("p", null, "Prêmio: " + fmtMoeda(rel.totals.prizePool) + " · Dealer: " + fmtMoeda(rel.totals.dealerTotal)));
-        var tabela = el("table", "lista");
-        var thead = el("thead");
-        var trh = el("tr");
-        ["Jogador", "Rebuys", "Add-on", "Pago", "Eliminado"].forEach(function (titulo) { trh.appendChild(el("th", null, titulo)); });
-        thead.appendChild(trh);
-        tabela.appendChild(thead);
-        var tbody = el("tbody");
-        rel.participants.forEach(function (p) {
-          var tr = el("tr");
-          tr.appendChild(el("td", null, p.name));
-          tr.appendChild(el("td", null, String(p.rebuys)));
-          tr.appendChild(el("td", null, p.addon ? "sim" : "não"));
-          tr.appendChild(el("td", null, p.paid ? "sim" : "não"));
-          tr.appendChild(el("td", null, p.eliminated ? "sim" : "não"));
-          tbody.appendChild(tr);
-        });
-        tabela.appendChild(tbody);
-        caixa.appendChild(tabela);
-
-        caixa.appendChild(el("h3", null, "Linha do tempo"));
-        if (!rel.events || !rel.events.length) {
-          caixa.appendChild(el("p", "rotulo", "Sem eventos registrados."));
-        } else {
-          var listaEventos = el("ul", "tags");
-          listaEventos.style.flexDirection = "column";
-          listaEventos.style.alignItems = "flex-start";
-          listaEventos.style.gap = "6px";
-          rel.events.forEach(function (ev) {
-            var hora = new Date(ev.createdAt).toLocaleString("pt-BR");
-            listaEventos.appendChild(el("li", null, hora + " — " + fmtEvento(ev)));
-          });
-          caixa.appendChild(listaEventos);
-        }
-      });
-  }
-
-  var ROTULOS_EVENTO = {
-    torneio_criado: "Torneio criado",
-    torneio_finalizado: "Torneio finalizado",
-    entrada: "Entrada",
-    rebuy: "Rebuy",
-    addon: "Add-on",
-    reentrada: "Reentrada",
-    saida: "Saída (eliminado)",
-    removido: "Removido",
-  };
-
-  function fmtEvento(ev) {
-    var rotulo = ROTULOS_EVENTO[ev.type] || ev.type;
-    return ev.detail ? (rotulo + ": " + ev.detail) : rotulo;
   }
 
   // ------------------------------------------------------------------- tema --
@@ -669,7 +742,7 @@
   // --------------------------------------------------------------- wiring --
 
   function wirePlayPauseButtons() {
-    [["timer-botao-playpause"], ["admin-botao-playpause"]].forEach(function (arr) {
+    [["timer-botao-playpause"], ["gerente-botao-playpause"]].forEach(function (arr) {
       var botao = document.getElementById(arr[0]);
       if (!botao) return;
       botao.addEventListener("click", function () {
@@ -679,22 +752,22 @@
         Api.enviarAcao(url, "POST", {});
       });
     });
-    [["timer-botao-next"], ["admin-botao-next"]].forEach(function (arr) {
+    [["timer-botao-next"], ["gerente-botao-next"]].forEach(function (arr) {
       var botao = document.getElementById(arr[0]);
       if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/next", "POST", {}); });
     });
-    [["timer-botao-prev"], ["admin-botao-prev"]].forEach(function (arr) {
+    [["timer-botao-prev"], ["gerente-botao-prev"]].forEach(function (arr) {
       var botao = document.getElementById(arr[0]);
       if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/prev", "POST", {}); });
     });
-    [["timer-botao-mais1", 1], ["admin-botao-mais1", 1], ["timer-botao-menos1", -1], ["admin-botao-menos1", -1]].forEach(function (arr) {
+    [["timer-botao-mais1", 1], ["gerente-botao-mais1", 1], ["timer-botao-menos1", -1], ["gerente-botao-menos1", -1]].forEach(function (arr) {
       var botao = document.getElementById(arr[0]);
       if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/adjust", "POST", { deltaMinutes: arr[1] }); });
     });
   }
 
   function confirmarFinalizacao(url) {
-    if (!confirm("Finalizar o torneio atual? Ele vai para o histórico e os controles de timer/jogadores param de valer até você iniciar um novo.")) return;
+    if (!confirm("Finalizar o torneio atual? Ele vai para o histórico (aba Admin) e os controles de timer/jogadores param de valer até você iniciar um novo.")) return;
     Api.enviarAcao(url, "POST", {});
   }
 
@@ -715,56 +788,28 @@
     document.getElementById("gerente-botao-finalizar-torneio").addEventListener("click", function () {
       confirmarFinalizacao("/api/tournaments/finalizar");
     });
-  }
 
-  function lerCamposGeraisAdmin() {
-    return {
-      name: document.getElementById("admin-input-nome").value,
-      entryValue: parseNumeroAbreviado(document.getElementById("admin-input-entry").value),
-      reentryValue: parseNumeroAbreviado(document.getElementById("admin-input-reentry").value),
-      addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
-      actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
-      dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
-      chipValues: document.getElementById("admin-input-fichas").value,
-    };
-  }
-
-  function wireAdminForm() {
-    // Os campos gerais do torneio não salvam sozinhos — só ao clicar em "Confirmar",
-    // que também libera o botão de tocar o timer (ver campo `configured`).
-    document.getElementById("admin-botao-confirmar").addEventListener("click", function () {
-      var corpo = lerCamposGeraisAdmin();
-      corpo.configured = true;
-      executarAcao("/api/admin", "PATCH", corpo, function (rascunho) {
-        Object.assign(rascunho.tournament, corpo);
-      });
-    });
-
-    document.getElementById("admin-botao-mudo").addEventListener("click", function () {
+    document.getElementById("gerente-botao-mudo").addEventListener("click", function () {
       var estado = estadoExibido();
       var novoMudo = !estado.tournament.muted;
       executarAcao("/api/admin", "PATCH", { muted: novoMudo }, function (rascunho) { rascunho.tournament.muted = novoMudo; });
-    });
-
-    document.getElementById("admin-botao-add-nivel").addEventListener("click", function () {
-      var estado = estadoExibido();
-      var novosNiveis = estado.tournament.levels.concat([{ sb: 0, bb: 0, ante: 0, minutes: 10, isBreak: false }]);
-      salvarNiveisDireto(novosNiveis);
-    });
-
-    document.getElementById("admin-botao-finalizar-torneio").addEventListener("click", function () {
-      confirmarFinalizacao("/api/tournaments/finalizar");
-    });
-
-    document.getElementById("admin-botao-novo-torneio").addEventListener("click", function () {
-      if (!confirm("Isso finaliza o torneio atual (se ainda não estiver finalizado) e começa um novo (zera jogadores). Continuar?")) return;
-      var nome = prompt("Nome do novo torneio:", "Home Game") || "Home Game";
-      Api.enviarAcao("/api/tournaments/novo", "POST", { name: nome });
     });
   }
 
   function wireTema() {
     document.getElementById("botao-tema").addEventListener("click", alternarTema);
+  }
+
+  function wireBotaoAtivarSom() {
+    // Um clique no Admin (outro aparelho) não libera o áudio na tela do Timer (TV) —
+    // cada carregamento de página precisa do próprio gesto do usuário, por causa da
+    // política de autoplay do navegador. Por isso não fica "lembrado" entre reloads.
+    var botao = document.getElementById("timer-botao-ativar-som");
+    if (!botao) return;
+    botao.addEventListener("click", function () {
+      Audio30.destravar();
+      botao.style.display = "none";
+    });
   }
 
   // ------------------------------------------------------------------ boot --
@@ -777,8 +822,9 @@
   aplicarTemaSalvo();
   wirePlayPauseButtons();
   wireGerenteForm();
-  wireAdminForm();
+  wireAdminPainel();
   wireTema();
+  wireBotaoAtivarSom();
   wireSeletorTorneio();
 
   Api.aoAtualizarEstado(renderTudo);

@@ -21,9 +21,9 @@
     var idx = torneio.currentLevelIndex;
     var restante = calcularRestante(estado);
 
-    // Só a aba que está mostrando a tela Timer toca o alarme — senão, cada aba aberta
-    // (Admin, Gerente, abas esquecidas) tocaria o mesmo aviso de forma independente e fora de sincronia.
-    var exibindoTimer = window.ROTA_ATUAL === "timer";
+    // Só quem está olhando o relógio (Timer ou Gerente) toca o alarme — Admin/Menu
+    // ficam mudos, e abas esquecidas nessas telas não tocam junto fora de sincronia.
+    var exibindoTimer = window.ROTA_ATUAL === "timer" || window.ROTA_ATUAL === "gerente";
 
     if (ultimoNivelVisto !== idx) {
       if (ultimoNivelVisto !== null && exibindoTimer) Audio30.bipar(torneio.muted);
