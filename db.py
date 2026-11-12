@@ -64,6 +64,7 @@ def inicializar():
             action_price REAL NOT NULL,
             dealer_share REAL NOT NULL,
             chip_values TEXT NOT NULL,
+            configured INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             finished_at TEXT
         );
@@ -95,6 +96,7 @@ def inicializar():
         """
     )
     con.commit()
+    _migrar(con)
 
     atual = con.execute(
         "SELECT value FROM settings WHERE key = 'current_tournament_id'"
@@ -102,6 +104,17 @@ def inicializar():
     if atual is None:
         criar_torneio(con, nome="Home Game")
     con.close()
+
+
+def _migrar(con):
+    # CREATE TABLE IF NOT EXISTS não adiciona colunas a um banco já existente,
+    # então bancos criados antes de um novo campo precisam desse ajuste manual.
+    colunas = {row["name"] for row in con.execute("PRAGMA table_info(tournaments)")}
+    if "configured" not in colunas:
+        con.execute("ALTER TABLE tournaments ADD COLUMN configured INTEGER NOT NULL DEFAULT 0")
+        # Torneios que já existiam antes dessa trava continuam utilizáveis sem re-confirmação.
+        con.execute("UPDATE tournaments SET configured = 1")
+        con.commit()
 
 
 def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):

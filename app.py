@@ -35,6 +35,7 @@ class AdminUpdate(BaseModel):
     dealerShare: Optional[float] = None
     chipValues: Optional[str] = None
     muted: Optional[bool] = None
+    configured: Optional[bool] = None
 
 
 class AjusteTimer(BaseModel):
@@ -183,6 +184,7 @@ def montar_snapshot(con) -> dict:
             "entriesClosed": _entradas_fechadas(levels, row["current_level_index"]),
             "elapsedSeconds": elapsed,
             "muted": bool(row["muted"]),
+            "configured": bool(row["configured"]),
             "entryValue": entry_value,
             "reentryValue": reentry_value,
             "addonValue": addon_value,
@@ -348,6 +350,7 @@ async def atualizar_admin(body: AdminUpdate):
         "dealerShare": "dealer_share",
         "chipValues": "chip_values",
         "muted": "muted",
+        "configured": "configured",
     }
     campos = []
     valores = []
@@ -357,7 +360,7 @@ async def atualizar_admin(body: AdminUpdate):
             valor = dados[chave]
             if chave == "levels":
                 valor = json.dumps(valor)
-            if chave == "muted":
+            if chave in ("muted", "configured"):
                 valor = 1 if valor else 0
             campos.append(f"{coluna} = ?")
             valores.append(valor)
@@ -391,6 +394,8 @@ async def timer_play():
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
+        if not row["configured"]:
+            raise HTTPException(400, "Confirme a configuração do torneio no Admin antes de iniciar")
         if row["status"] != "running":
             _aplicar_timer(con, row, status="running", reference_at=db.agora_iso())
     finally:

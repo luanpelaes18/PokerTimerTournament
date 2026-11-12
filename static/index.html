@@ -35,6 +35,7 @@
 
     <div class="cartao">
       <div class="totais" id="gerente-totais"></div>
+      <button class="botao" id="gerente-botao-finalizar-torneio" type="button" style="margin-top:12px">Finalizar torneio</button>
     </div>
 
     <div class="cartao">
@@ -105,7 +106,10 @@
 
     <div class="grade-admin">
       <div class="cartao">
-        <h3>Torneio</h3>
+        <div class="topo" style="margin-bottom:8px">
+          <h3 style="margin:0">Torneio</h3>
+          <span class="selo-conexao" id="admin-selo-configurado">não confirmado</span>
+        </div>
         <form class="form-grade" id="form-admin-geral">
           <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
           <label class="campo">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
@@ -115,6 +119,7 @@
           <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
           <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
         </form>
+        <button class="botao primario" id="admin-botao-confirmar" type="button">Confirmar e salvar configuração</button>
         <button class="botao" id="admin-botao-finalizar-torneio" type="button">Finalizar torneio</button>
         <button class="botao perigo" id="admin-botao-novo-torneio" type="button">Iniciar novo torneio</button>
       </div>

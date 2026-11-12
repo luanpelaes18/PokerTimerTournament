@@ -231,6 +231,10 @@
     var botaoMudo = document.getElementById("admin-botao-mudo");
     botaoMudo.textContent = estado.tournament.muted ? "🔇 Mudo" : "🔈 Som";
 
+    var seloConfigurado = document.getElementById("admin-selo-configurado");
+    seloConfigurado.textContent = estado.tournament.configured ? "configurado ✓" : "não confirmado";
+    seloConfigurado.className = "selo-conexao " + (estado.tournament.configured ? "online" : "offline");
+
     renderizarNiveis(estado.tournament.levels);
   }
 
@@ -343,7 +347,11 @@
 
     ["timer-botao-playpause", "admin-botao-playpause"].forEach(function (id) {
       var botao = document.getElementById(id);
-      if (botao) botao.textContent = torneio.status === "running" ? "⏸ Pausar" : "▶ Tocar";
+      if (!botao) return;
+      botao.textContent = torneio.status === "running" ? "⏸ Pausar" : "▶ Tocar";
+      var bloqueado = !torneio.configured && torneio.status !== "running";
+      botao.disabled = bloqueado;
+      botao.title = bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "";
     });
   };
 
@@ -494,6 +502,11 @@
     });
   }
 
+  function confirmarFinalizacao(url) {
+    if (!confirm("Finalizar o torneio atual? Ele vai para o histórico e os controles de timer/jogadores param de valer até você iniciar um novo.")) return;
+    Api.enviarAcao(url, "POST", {});
+  }
+
   function wireGerenteForm() {
     var form = document.getElementById("form-novo-participante");
     form.addEventListener("submit", function (ev) {
@@ -507,23 +520,34 @@
       });
       input.value = "";
     });
+
+    document.getElementById("gerente-botao-finalizar-torneio").addEventListener("click", function () {
+      confirmarFinalizacao("/api/tournaments/finalizar");
+    });
+  }
+
+  function lerCamposGeraisAdmin() {
+    return {
+      name: document.getElementById("admin-input-nome").value,
+      entryValue: parseNumeroAbreviado(document.getElementById("admin-input-entry").value),
+      reentryValue: parseNumeroAbreviado(document.getElementById("admin-input-reentry").value),
+      addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
+      actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
+      dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
+      chipValues: document.getElementById("admin-input-fichas").value,
+    };
   }
 
   function wireAdminForm() {
-    var salvarGeral = debounce(function () {
-      var corpo = {
-        name: document.getElementById("admin-input-nome").value,
-        entryValue: parseNumeroAbreviado(document.getElementById("admin-input-entry").value),
-        reentryValue: parseNumeroAbreviado(document.getElementById("admin-input-reentry").value),
-        addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
-        actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
-        dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
-        chipValues: document.getElementById("admin-input-fichas").value,
-      };
-      Api.enviarAcao("/api/admin", "PATCH", corpo);
-    }, 600);
-
-    document.getElementById("form-admin-geral").addEventListener("input", salvarGeral);
+    // Os campos gerais do torneio não salvam sozinhos — só ao clicar em "Confirmar",
+    // que também libera o botão de tocar o timer (ver campo `configured`).
+    document.getElementById("admin-botao-confirmar").addEventListener("click", function () {
+      var corpo = lerCamposGeraisAdmin();
+      corpo.configured = true;
+      Api.enviarAcao("/api/admin", "PATCH", corpo, function (rascunho) {
+        Object.assign(rascunho.tournament, corpo);
+      });
+    });
 
     document.getElementById("admin-botao-mudo").addEventListener("click", function () {
       var estado = Api.obterEstado();
@@ -538,8 +562,7 @@
     });
 
     document.getElementById("admin-botao-finalizar-torneio").addEventListener("click", function () {
-      if (!confirm("Finalizar o torneio atual? Ele vai para o histórico e os controles de timer/jogadores param de valer até você iniciar um novo.")) return;
-      Api.enviarAcao("/api/tournaments/finalizar", "POST", {});
+      confirmarFinalizacao("/api/tournaments/finalizar");
     });
 
     document.getElementById("admin-botao-novo-torneio").addEventListener("click", function () {
