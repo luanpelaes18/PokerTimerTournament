@@ -1,34 +1,40 @@
+/* Paleta da identidade "LK" (lk-poker-identidade-visual) — violeta/índigo/ciano. */
 :root {
-  --bg: #0f1220;
-  --bg-elevado: #171b2e;
-  --borda: #2a2f49;
-  --texto: #f1f3fb;
-  --texto-fraco: #9aa0bd;
-  --destaque: #ffb13c;
+  --bg: #13152a;
+  --bg-elevado: #2a2a5a;
+  --borda: #4b2e83;
+  --texto: #f2e9ff;
+  --texto-fraco: #a79bd0;
+  --destaque: #8f7bd9;
   --verde: #3ddc84;
   --vermelho: #ff5d5d;
+  --indigo: #1a1f5a;
+  --deep: #2b124c;
+  --violet: #8f7bd9;
+  --blue: #3f6bd4;
+  --cyan: #6ce4ff;
   --fonte: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 :root[data-theme="light"] {
-  --bg: #f4f5fb;
+  --bg: #f3effa;
   --bg-elevado: #ffffff;
-  --borda: #dde0ef;
-  --texto: #1b1e2e;
-  --texto-fraco: #666c8a;
-  --destaque: #c9770c;
+  --borda: #ddd1f0;
+  --texto: #1d1535;
+  --texto-fraco: #675a8c;
+  --destaque: #5b3fa6;
   --verde: #1e9c5a;
   --vermelho: #c7362f;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #f4f5fb;
+    --bg: #f3effa;
     --bg-elevado: #ffffff;
-    --borda: #dde0ef;
-    --texto: #1b1e2e;
-    --texto-fraco: #666c8a;
-    --destaque: #c9770c;
+    --borda: #ddd1f0;
+    --texto: #1d1535;
+    --texto-fraco: #675a8c;
+    --destaque: #5b3fa6;
     --verde: #1e9c5a;
     --vermelho: #c7362f;
   }
@@ -58,6 +64,10 @@ body {
 
 .topo h1 { font-size: 1.1rem; margin: 0; color: var(--texto-fraco); font-weight: 600; }
 
+.marca-menu { display: flex; align-items: center; gap: 12px; }
+.logo-menu { width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; }
+.marca-menu h1 { font-size: 1.3rem; color: var(--texto); }
+
 .nav-telas { display: flex; gap: 8px; flex-wrap: wrap; }
 
 a.botao, button.botao {
@@ -74,7 +84,13 @@ a.botao, button.botao {
   cursor: pointer;
 }
 
-button.botao.primario { background: var(--destaque); color: #1b1e2e; border-color: transparent; font-weight: 600; }
+button.botao.primario {
+  background: linear-gradient(135deg, var(--violet), var(--blue));
+  color: #f2e9ff;
+  border-color: transparent;
+  font-weight: 600;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--violet) 50%, transparent);
+}
 button.botao.perigo { background: var(--vermelho); color: #fff; border-color: transparent; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
