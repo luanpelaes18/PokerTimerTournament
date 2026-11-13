@@ -65,6 +65,8 @@ def inicializar():
             dealer_share REAL NOT NULL,
             chip_values TEXT NOT NULL,
             configured INTEGER NOT NULL DEFAULT 0,
+            payout_json TEXT NOT NULL DEFAULT '[null, null, null]',
+            payout_confirmed INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             finished_at TEXT
         );
@@ -75,7 +77,7 @@ def inicializar():
             name TEXT NOT NULL,
             rebuys INTEGER NOT NULL DEFAULT 0,
             addon INTEGER NOT NULL DEFAULT 0,
-            paid INTEGER NOT NULL DEFAULT 0,
+            paid_amount REAL NOT NULL DEFAULT 0,
             eliminated INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL
         );
@@ -109,11 +111,45 @@ def inicializar():
 def _migrar(con):
     # CREATE TABLE IF NOT EXISTS não adiciona colunas a um banco já existente,
     # então bancos criados antes de um novo campo precisam desse ajuste manual.
-    colunas = {row["name"] for row in con.execute("PRAGMA table_info(tournaments)")}
-    if "configured" not in colunas:
+    colunas_torneios = {row["name"] for row in con.execute("PRAGMA table_info(tournaments)")}
+    if "configured" not in colunas_torneios:
         con.execute("ALTER TABLE tournaments ADD COLUMN configured INTEGER NOT NULL DEFAULT 0")
         # Torneios que já existiam antes dessa trava continuam utilizáveis sem re-confirmação.
         con.execute("UPDATE tournaments SET configured = 1")
+        con.commit()
+    if "payout_json" not in colunas_torneios:
+        con.execute("ALTER TABLE tournaments ADD COLUMN payout_json TEXT")
+        if {"payout_override_1", "payout_override_2", "payout_override_3"} <= colunas_torneios:
+            # Veio do esquema antigo de exatamente 3 posições fixas — migra pra lista.
+            for row in con.execute("SELECT id, payout_override_1, payout_override_2, payout_override_3 FROM tournaments"):
+                lista = [row["payout_override_1"], row["payout_override_2"], row["payout_override_3"]]
+                con.execute("UPDATE tournaments SET payout_json = ? WHERE id = ?", (json.dumps(lista), row["id"]))
+        else:
+            con.execute("UPDATE tournaments SET payout_json = '[null, null, null]' WHERE payout_json IS NULL")
+        con.commit()
+    if "payout_confirmed" not in colunas_torneios:
+        con.execute("ALTER TABLE tournaments ADD COLUMN payout_confirmed INTEGER NOT NULL DEFAULT 0")
+        con.commit()
+
+    colunas_participantes = {row["name"] for row in con.execute("PRAGMA table_info(participants)")}
+    if "paid_amount" not in colunas_participantes:
+        con.execute("ALTER TABLE participants ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0")
+        if "paid" in colunas_participantes:
+            # Migra o antigo sim/não: quem estava marcado como pago vira "pagou o valor
+            # devido inteiro" (estimado com o preço por ação do próprio torneio).
+            participantes = con.execute(
+                """
+                SELECT p.id, p.rebuys, p.addon, t.action_price
+                FROM participants p JOIN tournaments t ON t.id = p.tournament_id
+                WHERE p.paid = 1
+                """
+            ).fetchall()
+            for p in participantes:
+                acoes = 1 + p["rebuys"] + (1 if p["addon"] else 0)
+                con.execute(
+                    "UPDATE participants SET paid_amount = ? WHERE id = ?",
+                    (acoes * p["action_price"], p["id"]),
+                )
         con.commit()
 
 

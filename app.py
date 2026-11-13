@@ -33,7 +33,7 @@ class NovoParticipante(BaseModel):
 
 
 class ParticipanteUpdate(BaseModel):
-    paid: Optional[bool] = None
+    paidAmount: Optional[float] = None
     eliminated: Optional[bool] = None
 
 
@@ -48,6 +48,8 @@ class AdminUpdate(BaseModel):
     chipValues: Optional[str] = None
     muted: Optional[bool] = None
     configured: Optional[bool] = None
+    payout: Optional[List[Optional[float]]] = None
+    payoutConfirmed: Optional[bool] = None
     tournamentId: Optional[str] = None
 
 
@@ -91,7 +93,7 @@ class GerenciadorWS:
 ws_manager = GerenciadorWS()
 
 
-async def publicar_estado(tournament_id: Optional[str] = None):
+async def publicar_estado(tournament_id: Optional[str] = None, level_change_reason: Optional[str] = None):
     con = db.conectar()
     try:
         tid_atual = db.tournament_id_atual(con)
@@ -99,6 +101,10 @@ async def publicar_estado(tournament_id: Optional[str] = None):
         snapshot = montar_snapshot(con, alvo)
     finally:
         con.close()
+    if level_change_reason:
+        # "auto" = avançou sozinho por ter zerado o tempo (deve tocar o alarme);
+        # "manual" = alguém clicou num botão (não deve tocar).
+        snapshot["tournament"]["levelChangeReason"] = level_change_reason
     # Só transmite por WS quando a mutação foi no torneio ao vivo — editar um
     # rascunho não deve mexer no que telas (Timer/TV) de outros estão vendo.
     if alvo == tid_atual:
@@ -182,10 +188,9 @@ def montar_snapshot(con, tournament_id: Optional[str] = None) -> dict:
         total_chips += chips_p
         total_actions += acoes
         devido = acoes * action_price
-        if p["paid"]:
-            collected += devido
-        else:
-            pending += devido
+        pago = p["paid_amount"]
+        collected += pago
+        pending += max(0.0, devido - pago)
         if p["eliminated"]:
             eliminated_count += 1
         else:
@@ -195,7 +200,8 @@ def montar_snapshot(con, tournament_id: Optional[str] = None) -> dict:
             "name": p["name"],
             "rebuys": p["rebuys"],
             "addon": bool(p["addon"]),
-            "paid": bool(p["paid"]),
+            "paidAmount": pago,
+            "pendingAmount": max(0.0, devido - pago),
             "eliminated": bool(p["eliminated"]),
             "owed": devido,
             "createdAt": p["created_at"],
@@ -217,6 +223,8 @@ def montar_snapshot(con, tournament_id: Optional[str] = None) -> dict:
             "elapsedSeconds": elapsed,
             "muted": bool(row["muted"]),
             "configured": bool(row["configured"]),
+            "payout": json.loads(row["payout_json"]),
+            "payoutConfirmed": bool(row["payout_confirmed"]),
             "entryValue": entry_value,
             "reentryValue": reentry_value,
             "addonValue": addon_value,
@@ -339,6 +347,8 @@ async def registrar_addon(participant_id: str):
         p = _participante_row(con, participant_id)
         torneio = _tournament_row(con, p["tournament_id"])
         _garantir_editavel(torneio)
+        if p["eliminated"]:
+            raise HTTPException(400, "Jogador eliminado não pode fazer add-on — faça a reentrada primeiro")
         con.execute(
             "UPDATE participants SET addon = 1 WHERE id = ?", (participant_id,)
         )
@@ -353,9 +363,9 @@ async def registrar_addon(participant_id: str):
 async def atualizar_participante(participant_id: str, body: ParticipanteUpdate):
     campos = []
     valores = []
-    if body.paid is not None:
-        campos.append("paid = ?")
-        valores.append(1 if body.paid else 0)
+    if body.paidAmount is not None:
+        campos.append("paid_amount = ?")
+        valores.append(max(0.0, body.paidAmount))
     if body.eliminated is not None:
         campos.append("eliminated = ?")
         valores.append(1 if body.eliminated else 0)
@@ -392,6 +402,8 @@ async def atualizar_admin(body: AdminUpdate):
         "chipValues": "chip_values",
         "muted": "muted",
         "configured": "configured",
+        "payout": "payout_json",
+        "payoutConfirmed": "payout_confirmed",
     }
     campos = []
     valores = []
@@ -399,9 +411,9 @@ async def atualizar_admin(body: AdminUpdate):
     for chave, coluna in mapa.items():
         if chave in dados:
             valor = dados[chave]
-            if chave == "levels":
+            if chave in ("levels", "payout"):
                 valor = json.dumps(valor)
-            if chave in ("muted", "configured"):
+            if chave in ("muted", "configured", "payoutConfirmed"):
                 valor = 1 if valor else 0
             campos.append(f"{coluna} = ?")
             valores.append(valor)
@@ -463,6 +475,9 @@ async def timer_pause():
 
 @app.post("/api/timer/next")
 async def timer_next(body: AvancoNivel = AvancoNivel()):
+    # expectedIndex só vem preenchido quando é o avanço automático (tick do timer.js
+    # detectando que o tempo zerou) — usamos isso pra saber se toca o alarme ou não.
+    motivo = "auto" if body.expectedIndex is not None else "manual"
     con = db.conectar()
     try:
         row = _torneio_atual_row(con)
@@ -474,7 +489,7 @@ async def timer_next(body: AvancoNivel = AvancoNivel()):
             _aplicar_timer(con, row, current_level_index=novo_index, elapsed_before_ref=0, reference_at=ref)
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(level_change_reason=motivo)
 
 
 @app.post("/api/timer/prev")
@@ -488,7 +503,20 @@ async def timer_prev():
         _aplicar_timer(con, row, current_level_index=novo_index, elapsed_before_ref=0, reference_at=ref)
     finally:
         con.close()
-    return await publicar_estado()
+    return await publicar_estado(level_change_reason="manual")
+
+
+@app.post("/api/timer/reset")
+async def timer_reset():
+    con = db.conectar()
+    try:
+        row = _torneio_atual_row(con)
+        _garantir_editavel(row)
+        ref = db.agora_iso() if row["status"] == "running" else None
+        _aplicar_timer(con, row, current_level_index=0, elapsed_before_ref=0, reference_at=ref)
+    finally:
+        con.close()
+    return await publicar_estado(level_change_reason="manual")
 
 
 @app.post("/api/timer/adjust")
@@ -621,12 +649,15 @@ def relatorio_torneio(tournament_id: str):
         for p in participantes:
             acoes = 1 + p["rebuys"] + (1 if p["addon"] else 0)
             total_actions += acoes
+            devido_p = acoes * action_price
             itens.append({
                 "id": p["id"],
                 "name": p["name"],
                 "rebuys": p["rebuys"],
                 "addon": bool(p["addon"]),
-                "paid": bool(p["paid"]),
+                "owed": devido_p,
+                "paidAmount": p["paid_amount"],
+                "pendingAmount": max(0.0, devido_p - p["paid_amount"]),
                 "eliminated": bool(p["eliminated"]),
             })
 

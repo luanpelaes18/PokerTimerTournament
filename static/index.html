@@ -52,6 +52,15 @@
         </div>
 
         <div class="cartao">
+          <h3 style="margin-top:0" id="gerente-premio-titulo">Previsão de premiação</h3>
+          <p class="rotulo">Os 3 primeiros vêm com padrão 45% / 35% / 20% do prêmio acumulado. Cada campo é independente — edite qualquer um (inclusive pra zero). Limpe o campo pra voltar ao padrão. Adicione mais posições se pagar mais colocados.</p>
+          <div class="form-grade" id="gerente-premio-lista"></div>
+          <button class="botao" id="gerente-botao-add-premiado" type="button" style="margin-top:12px">+ Adicionar premiado</button>
+          <p class="rotulo" id="gerente-premio-total" style="margin-top:8px"></p>
+          <button class="botao primario" id="gerente-botao-confirmar-premiacao" type="button" style="margin-top:8px">Confirmar divisão de premiação</button>
+        </div>
+
+        <div class="cartao">
           <p class="timer-rotulo" id="gerente-rotulo-nivel">Nível 1</p>
           <div class="timer-blinds" id="gerente-blinds" style="font-size:1.8rem">—</div>
           <div class="timer-relogio" id="gerente-relogio" style="font-size:clamp(3rem,10vw,6rem)">00:00</div>
@@ -61,18 +70,19 @@
             <button class="botao" id="gerente-botao-next" type="button">Próximo ⏭</button>
             <button class="botao" id="gerente-botao-menos1" type="button">-1 min</button>
             <button class="botao" id="gerente-botao-mais1" type="button">+1 min</button>
+            <button class="botao perigo" id="gerente-botao-reiniciar" type="button">⟲ Reiniciar</button>
             <button class="botao" id="gerente-botao-mudo" type="button">🔈 Som</button>
           </div>
         </div>
 
-        <div class="cartao">
+        <div class="cartao cartao-jogadores">
           <form class="form-inline" id="form-novo-participante">
             <input type="text" id="input-novo-participante" placeholder="Nome do jogador" required>
             <button class="botao primario" type="submit">Adicionar</button>
           </form>
           <table class="lista">
             <thead>
-              <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Valor devido</th><th>Pago</th><th>Status</th><th>Ações</th></tr>
+              <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Valor devido</th><th>Valor pago</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr>
             </thead>
             <tbody id="gerente-lista-jogadores"></tbody>
           </table>
@@ -90,23 +100,32 @@
 
     <button class="botao primario" id="timer-botao-ativar-som" type="button" style="display:block; margin:16px auto; font-size:1.1rem; padding:14px 28px;">🔊 Toque aqui para ativar o som do alarme</button>
 
-    <p class="timer-rotulo" id="timer-rotulo-nivel">Nível 1</p>
-    <div class="timer-blinds" id="timer-blinds">—</div>
-    <div class="timer-relogio" id="timer-relogio">00:00</div>
-    <p class="timer-prox" id="timer-proximo-nivel"></p>
+    <div class="timer-grade">
+      <div class="timer-fichas" id="timer-fichas"></div>
 
-    <div class="timer-stats">
-      <div><div class="valor" id="timer-prize-pool">R$ 0</div><div class="rotulo">Prêmio acumulado</div></div>
-      <div><div class="valor" id="timer-jogadores-ativos">0</div><div class="rotulo">Jogadores ativos</div></div>
-      <div><div class="valor" id="timer-stack-medio">0</div><div class="rotulo">Stack médio</div></div>
-    </div>
+      <div class="timer-principal">
+        <p class="timer-rotulo" id="timer-rotulo-nivel">Nível 1</p>
+        <div class="timer-blinds" id="timer-blinds">—</div>
+        <div class="timer-relogio" id="timer-relogio">00:00</div>
+        <p class="timer-prox" id="timer-proximo-nivel"></p>
 
-    <div class="controles-timer">
-      <button class="botao" id="timer-botao-prev" type="button">⏮ Anterior</button>
-      <button class="botao primario" id="timer-botao-playpause" type="button">▶ Tocar</button>
-      <button class="botao" id="timer-botao-next" type="button">Próximo ⏭</button>
-      <button class="botao" id="timer-botao-menos1" type="button">-1 min</button>
-      <button class="botao" id="timer-botao-mais1" type="button">+1 min</button>
+        <div class="timer-stats">
+          <div><div class="valor" id="timer-prize-pool">R$ 0</div><div class="rotulo">Prêmio acumulado</div></div>
+          <div><div class="valor" id="timer-jogadores-ativos">0</div><div class="rotulo">Jogadores ativos</div></div>
+          <div><div class="valor" id="timer-stack-medio">0</div><div class="rotulo">Stack médio</div></div>
+        </div>
+
+        <p class="timer-prox" id="timer-premio-titulo" style="margin-top:20px">Previsão de premiação</p>
+        <div class="timer-stats" id="timer-premio-lista"></div>
+
+        <div class="controles-timer">
+          <button class="botao" id="timer-botao-prev" type="button">⏮ Anterior</button>
+          <button class="botao primario" id="timer-botao-playpause" type="button">▶ Tocar</button>
+          <button class="botao" id="timer-botao-next" type="button">Próximo ⏭</button>
+          <button class="botao" id="timer-botao-menos1" type="button">-1 min</button>
+          <button class="botao" id="timer-botao-mais1" type="button">+1 min</button>
+        </div>
+      </div>
     </div>
   </section>
 

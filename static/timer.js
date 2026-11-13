@@ -26,7 +26,10 @@
     var exibindoTimer = window.ROTA_ATUAL === "timer" || window.ROTA_ATUAL === "gerente";
 
     if (ultimoNivelVisto !== idx) {
-      if (ultimoNivelVisto !== null && exibindoTimer) Audio30.bipar(torneio.muted);
+      // Só toca quando o nível avançou sozinho (tempo zerou) — mudanças manuais
+      // (botões Próximo/Anterior/Reiniciar) não devem disparar o alarme.
+      var foiAutomatico = torneio.levelChangeReason === "auto";
+      if (ultimoNivelVisto !== null && exibindoTimer && foiAutomatico) Audio30.bipar(torneio.muted);
       ultimoNivelVisto = idx;
       alerta30Disparado = false;
     }

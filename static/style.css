@@ -42,12 +42,15 @@
 
 * { box-sizing: border-box; }
 
+html { overflow-x: hidden; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--texto);
   font-family: var(--fonte);
   min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .tela { display: none; min-height: 100vh; padding: 16px; }
@@ -74,9 +77,9 @@ a.botao, button.botao {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--bg-elevado);
+  background: var(--indigo);
   border: 1px solid var(--borda);
-  color: var(--texto);
+  color: #f2e9ff;
   padding: 8px 14px;
   border-radius: 10px;
   text-decoration: none;
@@ -122,6 +125,28 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .grade-menu a.cartao span { display: block; font-size: 0.85rem; color: var(--texto-fraco); font-weight: 400; margin-top: 6px; }
 
 /* ---- Timer ---- */
+#tela-timer { position: relative; }
+#tela-timer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("img/lk-logo.png") center 60% / min(85vw, 760px) no-repeat;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.timer-grade { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 28px; }
+.timer-principal { flex: 1 1 480px; min-width: 0; }
+
+.timer-fichas { display: flex; flex-direction: column; gap: 12px; width: 120px; flex-shrink: 0; }
+.ficha-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ficha-item img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid var(--borda); }
+.ficha-item span { font-weight: 700; font-size: 0.95rem; }
+@media (max-width: 760px) {
+  .timer-fichas { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; order: 2; }
+}
+
 .timer-rotulo { text-align: center; color: var(--texto-fraco); font-size: 1.1rem; margin-bottom: 4px; }
 .timer-relogio {
   text-align: center;
@@ -190,6 +215,24 @@ table.lista th { color: var(--texto-fraco); font-weight: 600; }
 }
 .campo-largo { grid-column: 1 / -1; }
 
+.input-pago {
+  width: 80px;
+  background: var(--bg);
+  border: 1px solid var(--borda);
+  color: var(--texto);
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-right: 6px;
+}
+
+#gerente-premio-total {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--texto);
+}
+#gerente-premio-total.premio-total-alerta { color: var(--vermelho); }
+
 .rotulo { color: var(--texto-fraco); font-size: 0.8rem; }
 
 .totais { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
@@ -206,8 +249,14 @@ table.lista th { color: var(--texto-fraco); font-weight: 600; }
   gap: 16px;
   align-items: start;
 }
-@media (max-width: 760px) {
+@media (max-width: 980px) {
   .admin-grade { grid-template-columns: 1fr; }
+  /* No celular, a divisão/gerenciamento dos jogadores é o que mais importa ao abrir
+     o Gerente — mostra essa lista primeiro, antes da lista de torneios e dos cards
+     de totais/premiação/timer. */
+  #tela-gerente .admin-col-detalhe { display: flex; flex-direction: column; }
+  #tela-gerente .cartao-jogadores { order: -1; }
+  #tela-gerente .admin-col-lista { order: 1; }
 }
 .admin-col-lista { max-height: 80vh; overflow-y: auto; }
 

@@ -1,8 +1,9 @@
 (function () {
   // ---------------------------------------------------------- utilidades --
 
+  // Valores em R$ são sempre inteiros neste app (sem centavos).
   function fmtMoeda(valor) {
-    return "R$ " + (valor || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return "R$ " + Math.round(valor || 0).toLocaleString("pt-BR");
   }
 
   function fmtNumero(valor) {
@@ -322,7 +323,7 @@
     var tabela = el("table", "lista");
     var thead = el("thead");
     var trh = el("tr");
-    ["Jogador", "Rebuys", "Add-on", "Pago", "Eliminado"].forEach(function (titulo) { trh.appendChild(el("th", null, titulo)); });
+    ["Jogador", "Rebuys", "Add-on", "Devido", "Pago", "Falta", "Eliminado"].forEach(function (titulo) { trh.appendChild(el("th", null, titulo)); });
     thead.appendChild(trh);
     tabela.appendChild(thead);
     var tbody = el("tbody");
@@ -331,7 +332,9 @@
       tr.appendChild(el("td", null, p.name));
       tr.appendChild(el("td", null, String(p.rebuys)));
       tr.appendChild(el("td", null, p.addon ? "sim" : "não"));
-      tr.appendChild(el("td", null, p.paid ? "sim" : "não"));
+      tr.appendChild(el("td", null, fmtMoeda(p.owed)));
+      tr.appendChild(el("td", null, fmtMoeda(p.paidAmount)));
+      tr.appendChild(el("td", null, fmtMoeda(p.pendingAmount)));
       tr.appendChild(el("td", null, p.eliminated ? "sim" : "não"));
       tbody.appendChild(tr);
     });
@@ -545,9 +548,171 @@
     });
   }
 
+  // Previsão de premiação: lista de posições é dinâmica (torneio.payout é um array,
+  // uma posição por colocado). As 3 primeiras vêm com padrão 45%/35%/20% do prêmio,
+  // as demais com 0% — cada posição é independente e pode ser sobrescrita livremente
+  // (inclusive para 0). Os valores ficam salvos no torneio (servidor), pra aparecer
+  // sincronizado também no Timer.
+  var PREMIO_PADRAO = [0.45, 0.35, 0.20];
+
+  function percentualPadraoPremio(indice) {
+    return PREMIO_PADRAO[indice] || 0;
+  }
+
+  function valorOuVazio(v) {
+    return v > 0 ? String(Math.round(v)) : "";
+  }
+
+  function calcularValoresPremio(estado) {
+    var pool = estado.totals.prizePool;
+    var payout = estado.tournament.payout || [];
+    return payout.map(function (override, indice) {
+      return (override !== null && override !== undefined) ? override : pool * percentualPadraoPremio(indice);
+    });
+  }
+
+  // Monta (uma única vez por posição) a linha editável do Gerente, já com os
+  // listeners de edição e remoção amarrados ao índice daquela posição.
+  function construirLinhaPremio(indice) {
+    var label = el("label", "campo");
+    label.appendChild(el("span", null, (indice + 1) + "º lugar"));
+
+    var linha = el("div");
+    linha.style.display = "flex";
+    linha.style.gap = "4px";
+
+    var input = el("input");
+    input.type = "text";
+    input.inputMode = "text";
+    input.id = "gerente-premio-" + indice;
+    linha.appendChild(input);
+
+    var botaoRemover = el("button", "botao perigo", "x");
+    botaoRemover.type = "button";
+    botaoRemover.id = "gerente-premio-remover-" + indice;
+    botaoRemover.title = "Remover esta posição";
+    botaoRemover.addEventListener("click", function () {
+      var estadoAtual = estadoExibido();
+      var payoutAtual = estadoAtual && estadoAtual.tournament.payout;
+      if (!payoutAtual || payoutAtual.length <= 1) return;
+      var novoPayout = payoutAtual.filter(function (_, idx) { return idx !== indice; });
+      executarAcao("/api/admin", "PATCH", { payout: novoPayout }, function (rascunho) {
+        rascunho.tournament.payout = novoPayout;
+      });
+    });
+    linha.appendChild(botaoRemover);
+
+    label.appendChild(linha);
+
+    input.addEventListener("change", function () {
+      var estadoAtual = estadoExibido();
+      if (!estadoAtual) return;
+      var texto = input.value.trim();
+      var novoPayout = (estadoAtual.tournament.payout || []).slice();
+      novoPayout[indice] = texto === "" ? null : parseNumeroAbreviado(texto);
+      executarAcao("/api/admin", "PATCH", { payout: novoPayout }, function (rascunho) {
+        rascunho.tournament.payout = novoPayout;
+      });
+    });
+    input.addEventListener("keydown", function (ev) { if (ev.key === "Enter") input.blur(); });
+
+    return label;
+  }
+
+  // Painel editável (Gerente) — respeita o modo rascunho como os outros campos do torneio.
+  function renderizarPremiacaoGerente(estado) {
+    var payout = estado.tournament.payout || [];
+    var valores = calcularValoresPremio(estado);
+    var total = valores.reduce(function (soma, v) { return soma + v; }, 0);
+    var confirmada = !!estado.tournament.payoutConfirmed;
+
+    var lista = document.getElementById("gerente-premio-lista");
+    if (lista) {
+      while (lista.children.length > payout.length) lista.removeChild(lista.lastChild);
+      while (lista.children.length < payout.length) lista.appendChild(construirLinhaPremio(lista.children.length));
+
+      payout.forEach(function (_, indice) {
+        var input = document.getElementById("gerente-premio-" + indice);
+        if (!input) return;
+        input.disabled = confirmada;
+        var botaoRemover = document.getElementById("gerente-premio-remover-" + indice);
+        if (botaoRemover) botaoRemover.disabled = confirmada || payout.length <= 1;
+        if (document.activeElement === input) return;
+        input.value = valorOuVazio(valores[indice]);
+        input.placeholder = "0";
+      });
+    }
+
+    var rotuloTotal = document.getElementById("gerente-premio-total");
+    if (rotuloTotal) {
+      var diferenca = Math.round(estado.totals.prizePool - total);
+      rotuloTotal.textContent = "Total alocado: " + fmtMoeda(total) + " de " + fmtMoeda(estado.totals.prizePool) +
+        (diferenca !== 0 ? (diferenca > 0 ? " (falta " + fmtMoeda(diferenca) + ")" : " (" + fmtMoeda(-diferenca) + " acima do prêmio)") : " ✓");
+      rotuloTotal.classList.toggle("premio-total-alerta", diferenca !== 0);
+    }
+
+    var titulo = document.getElementById("gerente-premio-titulo");
+    if (titulo) titulo.textContent = confirmada ? "Premiação (confirmada)" : "Previsão de premiação";
+
+    var botaoConfirmar = document.getElementById("gerente-botao-confirmar-premiacao");
+    if (botaoConfirmar) {
+      botaoConfirmar.textContent = confirmada ? "🔓 Destravar premiação" : "Confirmar divisão de premiação";
+      botaoConfirmar.className = confirmada ? "botao" : "botao primario";
+    }
+
+    var botaoAdicionar = document.getElementById("gerente-botao-add-premiado");
+    if (botaoAdicionar) botaoAdicionar.disabled = confirmada;
+  }
+
+  // Painel só de exibição (Timer) — sempre reflete o torneio ao vivo, sem edição,
+  // então pode simplesmente reconstruir as células a cada atualização.
+  function renderizarPremiacaoTimer(estado) {
+    var valores = calcularValoresPremio(estado);
+    var lista = document.getElementById("timer-premio-lista");
+    if (lista) {
+      lista.textContent = "";
+      valores.forEach(function (valor, indice) {
+        var caixa = el("div");
+        caixa.appendChild(el("div", "valor", fmtMoeda(valor)));
+        caixa.appendChild(el("div", "rotulo", (indice + 1) + "º lugar"));
+        lista.appendChild(caixa);
+      });
+    }
+    var titulo = document.getElementById("timer-premio-titulo");
+    if (titulo) titulo.textContent = estado.tournament.payoutConfirmed ? "Premiação" : "Previsão de premiação";
+  }
+
+  function wirePremiacao() {
+    var botaoAdicionar = document.getElementById("gerente-botao-add-premiado");
+    if (botaoAdicionar) {
+      botaoAdicionar.addEventListener("click", function () {
+        var estadoAtual = estadoExibido();
+        if (!estadoAtual) return;
+        var novoPayout = (estadoAtual.tournament.payout || []).slice();
+        novoPayout.push(null);
+        executarAcao("/api/admin", "PATCH", { payout: novoPayout }, function (rascunho) {
+          rascunho.tournament.payout = novoPayout;
+        });
+      });
+    }
+
+    var botaoConfirmar = document.getElementById("gerente-botao-confirmar-premiacao");
+    if (botaoConfirmar) {
+      botaoConfirmar.addEventListener("click", function () {
+        var estado = estadoExibido();
+        if (!estado) return;
+        var novoValor = !estado.tournament.payoutConfirmed;
+        executarAcao("/api/admin", "PATCH", { payoutConfirmed: novoValor }, function (rascunho) {
+          rascunho.tournament.payoutConfirmed = novoValor;
+        });
+      });
+    }
+  }
+
   function renderizarGerente(estado) {
     document.getElementById("gerente-nome-torneio").textContent = estado.tournament.name;
     renderizarTotais("gerente-totais", estado.tournament, estado.totals, true);
+    renderizarPremiacaoGerente(estado);
 
     var tbody = document.getElementById("gerente-lista-jogadores");
     tbody.textContent = "";
@@ -561,13 +726,16 @@
       var tdAddon = el("td");
       if (p.addon) {
         tdAddon.appendChild(el("span", "chip ok", "feito"));
+      } else if (p.eliminated) {
+        // Eliminado não pode fazer add-on — só volta a poder depois de uma reentrada.
+        tdAddon.appendChild(el("span", "rotulo", "—"));
       } else {
         var botaoAddon = el("button", "botao", "Add-on");
         botaoAddon.type = "button";
         botaoAddon.addEventListener("click", function () {
           executarAcao("/api/participants/" + p.id + "/addon", "POST", {}, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-            if (alvo) { alvo.addon = true; alvo.owed += rascunho.tournament.actionPrice; }
+            if (alvo) { alvo.addon = true; alvo.owed += rascunho.tournament.actionPrice; alvo.pendingAmount = Math.max(0, alvo.owed - alvo.paidAmount); }
           });
         });
         tdAddon.appendChild(botaoAddon);
@@ -575,19 +743,47 @@
       tr.appendChild(tdAddon);
 
       tr.appendChild(el("td", null, fmtMoeda(p.owed)));
+      tr.appendChild(el("td", null, fmtMoeda(p.paidAmount)));
 
       var tdPago = el("td");
-      var checkPago = el("input");
-      checkPago.type = "checkbox";
-      checkPago.checked = p.paid;
-      checkPago.addEventListener("change", function () {
-        var novoValor = checkPago.checked;
-        executarAcao("/api/participants/" + p.id, "PATCH", { paid: novoValor }, function (rascunho) {
-          var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-          if (alvo) alvo.paid = novoValor;
+
+      if (p.pendingAmount > 0) {
+        var inputPago = el("input", "input-pago");
+        inputPago.type = "text";
+        inputPago.value = "";
+        inputPago.placeholder = "novo pag.";
+        inputPago.title = "Valor do pagamento que a pessoa está fazendo agora (soma ao que já foi pago) — aceita abreviações (2k = 2000)";
+        function salvarPagamento() {
+          var incremento = parseNumeroAbreviado(inputPago.value);
+          if (!incremento) return;
+          var novoTotal = p.paidAmount + incremento;
+          executarAcao("/api/participants/" + p.id, "PATCH", { paidAmount: novoTotal }, function (rascunho) {
+            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+            if (alvo) { alvo.paidAmount = novoTotal; alvo.pendingAmount = Math.max(0, alvo.owed - novoTotal); }
+          });
+          inputPago.value = "";
+        }
+        inputPago.addEventListener("keydown", function (ev) { if (ev.key === "Enter") salvarPagamento(); });
+        tdPago.appendChild(inputPago);
+
+        var botaoPagar = el("button", "botao", "Pagar");
+        botaoPagar.type = "button";
+        botaoPagar.addEventListener("click", salvarPagamento);
+        tdPago.appendChild(botaoPagar);
+
+        var botaoPagarTudo = el("button", "botao", "Pagar tudo");
+        botaoPagarTudo.type = "button";
+        botaoPagarTudo.addEventListener("click", function () {
+          executarAcao("/api/participants/" + p.id, "PATCH", { paidAmount: p.owed }, function (rascunho) {
+            var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
+            if (alvo) { alvo.paidAmount = p.owed; alvo.pendingAmount = 0; }
+          });
         });
-      });
-      tdPago.appendChild(checkPago);
+        tdPago.appendChild(botaoPagarTudo);
+        tdPago.appendChild(el("div", "rotulo", "falta " + fmtMoeda(p.pendingAmount)));
+      } else {
+        tdPago.appendChild(el("span", "chip ok", "quitado"));
+      }
       tr.appendChild(tdPago);
 
       var tdStatus = el("td");
@@ -607,7 +803,7 @@
           botaoReentrada.addEventListener("click", function () {
             executarAcao("/api/participants/" + p.id + "/reentry", "POST", {}, function (rascunho) {
               var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-              if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; }
+              if (alvo) { alvo.rebuys += 1; alvo.eliminated = false; alvo.owed += rascunho.tournament.actionPrice; alvo.pendingAmount = Math.max(0, alvo.owed - alvo.paidAmount); }
             });
           });
           tdAcoes.appendChild(botaoReentrada);
@@ -620,7 +816,7 @@
         botaoRebuy.addEventListener("click", function () {
           executarAcao("/api/participants/" + p.id + "/rebuy", "POST", {}, function (rascunho) {
             var alvo = rascunho.participants.find(function (x) { return x.id === p.id; });
-            if (alvo) { alvo.rebuys += 1; alvo.owed += rascunho.tournament.actionPrice; }
+            if (alvo) { alvo.rebuys += 1; alvo.owed += rascunho.tournament.actionPrice; alvo.pendingAmount = Math.max(0, alvo.owed - alvo.paidAmount); }
           });
         });
         var botaoElim = el("button", "botao", "Eliminar");
@@ -655,6 +851,43 @@
     document.getElementById("timer-prize-pool").textContent = fmtMoeda(estado.totals.prizePool);
     document.getElementById("timer-jogadores-ativos").textContent = String(estado.totals.activeCount);
     document.getElementById("timer-stack-medio").textContent = fmtNumero(estado.totals.avgStack);
+    renderizarFichasTimer(estado.tournament.chipValues);
+    renderizarPremiacaoTimer(estado);
+  }
+
+  // Mapa dos valores de ficha cadastrados (Admin) para a foto real de cada uma.
+  var IMAGENS_FICHAS = {
+    100: "img/fichas/ficha-100.png",
+    500: "img/fichas/ficha-500.png",
+    1000: "img/fichas/ficha-1000.png",
+    5000: "img/fichas/ficha-5000.png",
+    25000: "img/fichas/ficha-25000.png",
+  };
+
+  var ultimoChipValuesRenderizado = null;
+
+  function renderizarFichasTimer(chipValues) {
+    if (chipValues === ultimoChipValuesRenderizado) return; // são sempre as mesmas fotos, não precisa refazer a cada tick
+    ultimoChipValuesRenderizado = chipValues;
+
+    var container = document.getElementById("timer-fichas");
+    if (!container) return;
+    container.textContent = "";
+    (chipValues || "").split(",").forEach(function (texto) {
+      var digitos = texto.replace(/\D/g, "");
+      if (!digitos) return;
+      var numero = parseInt(digitos, 10);
+      var item = el("div", "ficha-item");
+      var caminhoImagem = IMAGENS_FICHAS[numero];
+      if (caminhoImagem) {
+        var img = document.createElement("img");
+        img.src = caminhoImagem;
+        img.alt = "Ficha " + fmtNumero(numero);
+        item.appendChild(img);
+      }
+      item.appendChild(el("span", null, fmtNumero(numero)));
+      container.appendChild(item);
+    });
   }
 
   function renderizarMenu(estado) {
@@ -697,7 +930,7 @@
       botao.title = bloqueadoRascunho ? tituloRascunho : (bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "");
     });
 
-    ["gerente-botao-prev", "gerente-botao-next", "gerente-botao-mais1", "gerente-botao-menos1"].forEach(function (id) {
+    ["gerente-botao-prev", "gerente-botao-next", "gerente-botao-mais1", "gerente-botao-menos1", "gerente-botao-reiniciar"].forEach(function (id) {
       var botao = document.getElementById(id);
       if (!botao) return;
       botao.disabled = emRascunho;
@@ -764,6 +997,13 @@
       var botao = document.getElementById(arr[0]);
       if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/adjust", "POST", { deltaMinutes: arr[1] }); });
     });
+    var botaoReiniciar = document.getElementById("gerente-botao-reiniciar");
+    if (botaoReiniciar) {
+      botaoReiniciar.addEventListener("click", function () {
+        if (!confirm("Reiniciar o timer? Volta para o nível 1 e zera o tempo decorrido do torneio atual.")) return;
+        Api.enviarAcao("/api/timer/reset", "POST", {});
+      });
+    }
   }
 
   function confirmarFinalizacao(url) {
@@ -780,7 +1020,7 @@
       if (!nome) return;
       var idTemp = "tmp-" + Date.now();
       executarAcao("/api/participants", "POST", { name: nome }, function (rascunho) {
-        rascunho.participants.push({ id: idTemp, name: nome, rebuys: 0, addon: false, paid: false, eliminated: false, owed: rascunho.tournament.actionPrice, createdAt: new Date().toISOString() });
+        rascunho.participants.push({ id: idTemp, name: nome, rebuys: 0, addon: false, paidAmount: 0, pendingAmount: rascunho.tournament.actionPrice, eliminated: false, owed: rascunho.tournament.actionPrice, createdAt: new Date().toISOString() });
       });
       input.value = "";
     });
@@ -825,6 +1065,7 @@
   wireAdminPainel();
   wireTema();
   wireBotaoAtivarSom();
+  wirePremiacao();
   wireSeletorTorneio();
 
   Api.aoAtualizarEstado(renderTudo);

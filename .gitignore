@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 torneio.db
+.DS_Store
+imagens das fichas/
