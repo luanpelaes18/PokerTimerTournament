@@ -1,5 +1,7 @@
 # PokerTimerTournament
 
+*[Read in English](README.en.md)*
+
 Sistema de controle de torneios de poker para home games: cadastro de torneio (fichas, valores, estrutura de blinds), gerenciamento de jogadores (rebuy, add-on, reentrada, pagamentos) e um relógio de torneio sincronizado em tempo real entre vários dispositivos na mesma rede — ideal pra deixar um celular com o controle e um monitor/TV só com o relógio pros jogadores.
 
 Três telas: **Admin** (cadastro de torneios e histórico), **Gerente** (jogadores, timer e finalização) e **Timer** (relógio para a TV/monitor).
