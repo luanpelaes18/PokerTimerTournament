@@ -1,9 +1,12 @@
 import json
+import re
+import shutil
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -45,12 +48,16 @@ class AdminUpdate(BaseModel):
     addonValue: Optional[int] = None
     actionPrice: Optional[float] = None
     dealerShare: Optional[float] = None
-    chipValues: Optional[str] = None
+    chips: Optional[List[dict]] = None
     muted: Optional[bool] = None
     configured: Optional[bool] = None
     payout: Optional[List[Optional[float]]] = None
     payoutConfirmed: Optional[bool] = None
     tournamentId: Optional[str] = None
+
+
+class TemaCorUpdate(BaseModel):
+    theme: str
 
 
 class AjusteTimer(BaseModel):
@@ -230,9 +237,10 @@ def montar_snapshot(con, tournament_id: Optional[str] = None) -> dict:
             "addonValue": addon_value,
             "actionPrice": action_price,
             "dealerShare": dealer_share,
-            "chipValues": row["chip_values"],
+            "chips": json.loads(row["chips_json"]),
             "createdAt": row["created_at"],
         },
+        "colorTheme": db.cor_tema_atual(con),
         "participants": participantes_json,
         "totals": {
             "activeCount": active_count,
@@ -377,12 +385,34 @@ async def atualizar_participante(participant_id: str, body: ParticipanteUpdate):
             torneio = _tournament_row(con, p["tournament_id"])
             _garantir_editavel(torneio)
             torneio_id = torneio["id"]
+
+            # Captura quantos jogadores ainda estão ativos (incluindo este) ANTES de
+            # aplicar a eliminação — com entradas fechadas, ninguém mais entra nem sai
+            # do jogo além de eliminações, então esse número É a colocação final dele.
+            eliminando_agora = body.eliminated is True and not p["eliminated"]
+            ativos_antes = None
+            if eliminando_agora:
+                ativos_antes = con.execute(
+                    "SELECT COUNT(*) AS n FROM participants WHERE tournament_id = ? AND eliminated = 0",
+                    (torneio_id,),
+                ).fetchone()["n"]
+
             valores.append(participant_id)
             con.execute(
                 f"UPDATE participants SET {', '.join(campos)} WHERE id = ?", valores
             )
-            if body.eliminated is True:
-                db.registrar_evento(con, torneio_id, "saida", participant_id, p["name"])
+            if eliminando_agora:
+                levels = json.loads(torneio["levels_json"])
+                idx = torneio["current_level_index"]
+                nivel = levels[idx] if idx < len(levels) else {}
+                if nivel.get("isBreak"):
+                    nivel_texto = f"nível {idx + 1} (pausa)"
+                else:
+                    nivel_texto = f"nível {idx + 1} (SB {int(nivel.get('sb', 0))}/BB {int(nivel.get('bb', 0))})"
+                detalhe = f"{p['name']} — {nivel_texto}"
+                if _entradas_fechadas(levels, idx):
+                    detalhe += f" — {ativos_antes}º lugar"
+                db.registrar_evento(con, torneio_id, "saida", participant_id, detalhe)
             con.commit()
         finally:
             con.close()
@@ -399,7 +429,7 @@ async def atualizar_admin(body: AdminUpdate):
         "addonValue": "addon_value",
         "actionPrice": "action_price",
         "dealerShare": "dealer_share",
-        "chipValues": "chip_values",
+        "chips": "chips_json",
         "muted": "muted",
         "configured": "configured",
         "payout": "payout_json",
@@ -411,7 +441,7 @@ async def atualizar_admin(body: AdminUpdate):
     for chave, coluna in mapa.items():
         if chave in dados:
             valor = dados[chave]
-            if chave in ("levels", "payout"):
+            if chave in ("levels", "payout", "chips"):
                 valor = json.dumps(valor)
             if chave in ("muted", "configured", "payoutConfirmed"):
                 valor = 1 if valor else 0
@@ -687,6 +717,22 @@ def relatorio_torneio(tournament_id: str):
         con.close()
 
 
+@app.delete("/api/tournaments/{tournament_id}")
+async def excluir_torneio(tournament_id: str):
+    con = db.conectar()
+    try:
+        _tournament_row(con, tournament_id)  # 404 se não existir
+        if tournament_id == db.tournament_id_atual(con):
+            raise HTTPException(400, "Não é possível excluir o torneio atual. Na aba Gerente, selecione outro torneio e clique em \"Ativar este torneio\" primeiro.")
+        con.execute("DELETE FROM participants WHERE tournament_id = ?", (tournament_id,))
+        con.execute("DELETE FROM events WHERE tournament_id = ?", (tournament_id,))
+        con.execute("DELETE FROM tournaments WHERE id = ?", (tournament_id,))
+        con.commit()
+    finally:
+        con.close()
+    return {"ok": True}
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws_manager.conectar(ws)
@@ -700,6 +746,185 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.receive_text()
     except WebSocketDisconnect:
         ws_manager.desconectar(ws)
+
+
+# ------------------------------------------------------- configuração global --
+# Logo e modelos de ficha não são por torneio — vivem direto em static/img. O nome
+# de exibição de cada modelo/cor é escolhido por quem sobe o arquivo e fica guardado
+# num manifesto (modelos.json); a pasta/arquivo em si usa uma versão "slug" do nome.
+
+FICHAS_DIR = STATIC_DIR / "img" / "fichas"
+MANIFESTO_FICHAS = FICHAS_DIR / "modelos.json"
+NOME_LOGO = "lk-logo.png"
+
+
+def _slugificar(texto, padrao="sem-nome"):
+    texto = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode("ascii")
+    texto = re.sub(r"[^a-zA-Z0-9]+", "-", texto).strip("-").lower()
+    return texto or padrao
+
+
+def _slug_disponivel(slug, existentes):
+    if slug not in existentes:
+        return slug
+    i = 2
+    while f"{slug}-{i}" in existentes:
+        i += 1
+    return f"{slug}-{i}"
+
+
+def _ler_manifesto_fichas():
+    if MANIFESTO_FICHAS.exists():
+        return json.loads(MANIFESTO_FICHAS.read_text())
+    return {}
+
+
+def _salvar_manifesto_fichas(manifesto):
+    FICHAS_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFESTO_FICHAS.write_text(json.dumps(manifesto, ensure_ascii=False, indent=2))
+
+
+@app.get("/api/chip-models")
+async def listar_modelos_ficha():
+    manifesto = _ler_manifesto_fichas()
+    resultado = []
+    for slug, dados in manifesto.items():
+        cores = [{"id": cor_slug, "label": cor_label} for cor_slug, cor_label in dados.get("colors", {}).items()]
+        resultado.append({"model": slug, "label": dados.get("label", slug), "colors": cores})
+    return resultado
+
+
+def _validar_imagem(arquivo: UploadFile):
+    if not (arquivo.content_type or "").startswith("image/"):
+        raise HTTPException(400, "Envie um arquivo de imagem.")
+
+
+@app.post("/api/config/logo")
+async def enviar_logo(arquivo: UploadFile = File(...)):
+    _validar_imagem(arquivo)
+    conteudo = await arquivo.read()
+    (STATIC_DIR / "img" / NOME_LOGO).write_bytes(conteudo)
+    return {"ok": True}
+
+
+@app.post("/api/config/theme")
+async def definir_tema_cor(body: TemaCorUpdate):
+    if body.theme not in db.TEMAS_COR_VALIDOS:
+        raise HTTPException(400, "Tema inválido.")
+    con = db.conectar()
+    try:
+        db.definir_cor_tema(con, body.theme)
+    finally:
+        con.close()
+    # Broadcast pra toda tela conectada trocar de tema junto, sem precisar recarregar.
+    return await publicar_estado()
+
+
+@app.post("/api/config/chip-model")
+async def adicionar_modelo_ficha(
+    nome: str = Form(...),
+    cor_nome: List[str] = Form(...),
+    cor_arquivo: List[UploadFile] = File(...),
+):
+    if not nome.strip():
+        raise HTTPException(400, "Dê um nome ao modelo.")
+    if not cor_nome or len(cor_nome) != len(cor_arquivo):
+        raise HTTPException(400, "Envie ao menos uma cor, cada uma com nome e imagem.")
+    if any(not c.strip() for c in cor_nome):
+        raise HTTPException(400, "Dê um nome a cada cor.")
+    for arquivo in cor_arquivo:
+        _validar_imagem(arquivo)
+
+    manifesto = _ler_manifesto_fichas()
+    slug_modelo = _slug_disponivel(_slugificar(nome, "modelo"), set(manifesto.keys()))
+
+    pasta_modelo = FICHAS_DIR / slug_modelo
+    pasta_modelo.mkdir(parents=True, exist_ok=True)
+
+    cores_slugs = set()
+    cores = {}
+    for nome_cor, arquivo in zip(cor_nome, cor_arquivo):
+        slug_cor = _slug_disponivel(_slugificar(nome_cor, "cor"), cores_slugs)
+        cores_slugs.add(slug_cor)
+        cores[slug_cor] = nome_cor.strip()
+        conteudo = await arquivo.read()
+        (pasta_modelo / f"{slug_cor}.png").write_bytes(conteudo)
+
+    manifesto[slug_modelo] = {"label": nome.strip(), "colors": cores}
+    _salvar_manifesto_fichas(manifesto)
+
+    return {
+        "model": slug_modelo,
+        "label": manifesto[slug_modelo]["label"],
+        "colors": [{"id": cs, "label": cl} for cs, cl in cores.items()],
+    }
+
+
+@app.post("/api/config/chip-model/{slug_modelo}/colors")
+async def adicionar_cor_ao_modelo(slug_modelo: str, nome: str = Form(...), arquivo: UploadFile = File(...)):
+    if not nome.strip():
+        raise HTTPException(400, "Dê um nome à cor.")
+    _validar_imagem(arquivo)
+
+    manifesto = _ler_manifesto_fichas()
+    if slug_modelo not in manifesto:
+        raise HTTPException(404, "Modelo não encontrado.")
+
+    cores = manifesto[slug_modelo].setdefault("colors", {})
+    slug_cor = _slug_disponivel(_slugificar(nome, "cor"), set(cores.keys()))
+    cores[slug_cor] = nome.strip()
+
+    pasta_modelo = FICHAS_DIR / slug_modelo
+    pasta_modelo.mkdir(parents=True, exist_ok=True)
+    conteudo = await arquivo.read()
+    (pasta_modelo / f"{slug_cor}.png").write_bytes(conteudo)
+
+    _salvar_manifesto_fichas(manifesto)
+
+    return {
+        "model": slug_modelo,
+        "label": manifesto[slug_modelo]["label"],
+        "colors": [{"id": cs, "label": cl} for cs, cl in cores.items()],
+    }
+
+
+@app.delete("/api/config/chip-model/{slug_modelo}/colors/{slug_cor}")
+async def remover_cor_do_modelo(slug_modelo: str, slug_cor: str):
+    manifesto = _ler_manifesto_fichas()
+    if slug_modelo not in manifesto:
+        raise HTTPException(404, "Modelo não encontrado.")
+    cores = manifesto[slug_modelo].get("colors", {})
+    if slug_cor not in cores:
+        raise HTTPException(404, "Cor não encontrada.")
+
+    del cores[slug_cor]
+    _salvar_manifesto_fichas(manifesto)
+
+    arquivo = FICHAS_DIR / slug_modelo / f"{slug_cor}.png"
+    if arquivo.exists():
+        arquivo.unlink()
+
+    return {
+        "model": slug_modelo,
+        "label": manifesto[slug_modelo]["label"],
+        "colors": [{"id": cs, "label": cl} for cs, cl in cores.items()],
+    }
+
+
+@app.delete("/api/config/chip-model/{slug_modelo}")
+async def remover_modelo_ficha(slug_modelo: str):
+    manifesto = _ler_manifesto_fichas()
+    if slug_modelo not in manifesto:
+        raise HTTPException(404, "Modelo não encontrado.")
+
+    del manifesto[slug_modelo]
+    _salvar_manifesto_fichas(manifesto)
+
+    pasta_modelo = FICHAS_DIR / slug_modelo
+    if pasta_modelo.exists():
+        shutil.rmtree(pasta_modelo)
+
+    return {"ok": True}
 
 
 # --------------------------------------------------------------- estáticos --

@@ -229,6 +229,11 @@
   // Ao entrar no Admin pela primeira vez na sessão, tenta reabrir o torneio
   // que estava selecionado antes de recarregar a página.
   function entrarAdmin() {
+    // Recarrega a lista de modelos de ficha a cada visita (pode ter subido um novo
+    // modelo na Configuração desde a última vez) e atualiza a seleção já renderizada.
+    carregarModelosFicha().then(function () {
+      if (adminEstado) renderizarFichasAdmin(adminEstado.tournament.chips, true);
+    });
     if (adminRestaurado) { atualizarListaAdmin(); return; }
     adminRestaurado = true;
     var salvo = lerStorage("adminTorneioId");
@@ -244,19 +249,38 @@
   function renderizarListaAdminTorneios(lista) {
     var container = document.getElementById("admin-lista-torneios");
     if (!container) return;
+    var atual = Api.obterEstado();
+    var idAtual = atual ? atual.tournament.id : null;
     container.textContent = "";
     if (!lista.length) {
       container.appendChild(el("p", "rotulo", "Nenhum torneio cadastrado ainda."));
       return;
     }
     lista.forEach(function (t) {
-      var linha = el("button", "linha-torneio" + (t.id === adminTorneioId ? " selecionado" : ""));
-      linha.type = "button";
-      linha.appendChild(el("span", "nome", t.name + (t.status === "finished" ? " (finalizado)" : "")));
+      var linha = el("div", "linha-torneio" + (t.id === adminTorneioId ? " selecionado" : ""));
+      // "atual" é o torneio ativo agora (o Gerente que ativa/troca) — sem ele não dá
+      // pra excluir, então deixar isso visível aqui evita a confusão de "por que não excluiu".
+      var sufixo = t.id === idAtual ? " (atual)" : (t.status === "finished" ? " (finalizado)" : "");
+      linha.appendChild(el("span", "nome", t.name + sufixo));
       linha.appendChild(el("span", "rotulo", t.status + " — " + new Date(t.created_at).toLocaleDateString("pt-BR")));
       linha.addEventListener("click", function () { selecionarAdminTorneio(t.id, t.status); });
       container.appendChild(linha);
     });
+  }
+
+  // Excluir só fica disponível depois de abrir o torneio (editável ou relatório),
+  // não na listinha — evita clique acidental em algo que não pode ser desfeito.
+  function excluirTorneioComConfirmacao(id, nome) {
+    if (!confirm("Excluir o torneio \"" + nome + "\"? Essa ação não pode ser desfeita — apaga jogadores e histórico junto.")) return;
+    fetch("/api/tournaments/" + encodeURIComponent(id), { method: "DELETE" })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (erro) { throw new Error(erro.detail || "falha"); });
+        adminTorneioId = null;
+        gravarStorage("adminTorneioId", null);
+        mostrarPainelAdmin("admin-detalhe-vazio");
+        atualizarListaAdmin();
+      })
+      .catch(function (erro) { Api.avisar(erro.message || "Não foi possível excluir o torneio."); });
   }
 
   function selecionarAdminTorneio(id, status) {
@@ -291,7 +315,6 @@
     "admin-input-addon": "addonValue",
     "admin-input-preco": "actionPrice",
     "admin-input-dealer": "dealerShare",
-    "admin-input-fichas": "chipValues",
   };
 
   function renderizarFormAdmin(estado, forcar) {
@@ -309,6 +332,7 @@
     selo.textContent = estado.tournament.configured ? "salvo ✓" : "não salvo";
     selo.className = "selo-conexao " + (estado.tournament.configured ? "online" : "offline");
 
+    renderizarFichasAdmin(estado.tournament.chips, forcar);
     renderizarNiveisAdmin(estado.tournament.levels, forcar);
   }
 
@@ -355,6 +379,117 @@
       });
       caixa.appendChild(listaEventos);
     }
+
+    var botaoExcluir = el("button", "botao perigo", "Excluir torneio");
+    botaoExcluir.type = "button";
+    botaoExcluir.style.marginTop = "20px";
+    botaoExcluir.addEventListener("click", function () { excluirTorneioComConfirmacao(rel.id, rel.name); });
+    caixa.appendChild(botaoExcluir);
+  }
+
+  // Modelos/cores de ficha disponíveis (fotos em static/img/fichas/{modelo}/{cor}.png).
+  // Nome do modelo e de cada cor são escolhidos por quem sobe o arquivo (tela
+  // Configuração) — "modelo"/"cor" aqui são os slugs (ids), "label" é o nome exibido.
+  // Carregado do servidor; valor (dinheiro) e aparência (modelo+cor) são independentes.
+  var modelosFichaDisponiveis = [];
+
+  function carregarModelosFicha() {
+    return fetch("/api/chip-models")
+      .then(function (r) { return r.json(); })
+      .then(function (lista) { modelosFichaDisponiveis = lista; return lista; });
+  }
+
+  function coresDoModelo(modelo) {
+    var achado = modelosFichaDisponiveis.filter(function (m) { return m.model === modelo; })[0];
+    return achado ? achado.colors : [];
+  }
+
+  function caminhoImagemFicha(modelo, cor) {
+    return "img/fichas/" + modelo + "/" + cor + ".png";
+  }
+
+  function construirLinhaFicha(indice) {
+    var linha = el("div", "linha-ficha");
+
+    var preview = document.createElement("img");
+    preview.className = "ficha-preview-admin";
+    linha.appendChild(preview);
+
+    var input = el("input");
+    input.type = "text";
+    input.placeholder = "ex: 100";
+    linha.appendChild(input);
+
+    var selectModelo = document.createElement("select");
+    var selectCor = document.createElement("select");
+    linha.appendChild(selectModelo);
+    linha.appendChild(selectCor);
+
+    var botaoRemover = el("button", "botao perigo", "x");
+    botaoRemover.type = "button";
+    botaoRemover.title = "Remover esta ficha";
+    botaoRemover.addEventListener("click", function () {
+      var novasFichas = adminEstado.tournament.chips.filter(function (_, idx) { return idx !== indice; });
+      salvarFichasAdmin(novasFichas);
+    });
+    linha.appendChild(botaoRemover);
+
+    function salvarEstaLinha() {
+      var novasFichas = adminEstado.tournament.chips.map(function (f, idx) {
+        return idx === indice
+          ? { value: parseNumeroAbreviado(input.value), model: selectModelo.value, color: selectCor.value }
+          : f;
+      });
+      salvarFichasAdmin(novasFichas);
+    }
+    input.addEventListener("change", salvarEstaLinha);
+    input.addEventListener("keydown", function (ev) { if (ev.key === "Enter") input.blur(); });
+    selectModelo.addEventListener("change", salvarEstaLinha);
+    selectCor.addEventListener("change", salvarEstaLinha);
+
+    return linha;
+  }
+
+  function renderizarFichasAdmin(chips, forcar) {
+    var lista = document.getElementById("admin-lista-fichas");
+    if (!lista) return;
+    if (!forcar && document.activeElement && lista.contains(document.activeElement)) return; // evita piscar enquanto edita
+
+    while (lista.children.length > chips.length) lista.removeChild(lista.lastChild);
+    while (lista.children.length < chips.length) lista.appendChild(construirLinhaFicha(lista.children.length));
+
+    chips.forEach(function (ficha, indice) {
+      var linha = lista.children[indice];
+      if (!linha) return;
+      linha.querySelector("input").value = ficha.value;
+
+      var selects = linha.querySelectorAll("select");
+      var selectModelo = selects[0], selectCor = selects[1];
+
+      selectModelo.textContent = "";
+      modelosFichaDisponiveis.forEach(function (m) {
+        var opt = document.createElement("option");
+        opt.value = m.model;
+        opt.textContent = m.label;
+        selectModelo.appendChild(opt);
+      });
+      selectModelo.value = ficha.model;
+
+      selectCor.textContent = "";
+      coresDoModelo(selectModelo.value).forEach(function (cor) {
+        var opt = document.createElement("option");
+        opt.value = cor.id;
+        opt.textContent = cor.label;
+        selectCor.appendChild(opt);
+      });
+      selectCor.value = ficha.color;
+
+      linha.querySelector("img").src = caminhoImagemFicha(ficha.model, ficha.color);
+    });
+  }
+
+  function salvarFichasAdmin(novasFichas) {
+    salvarAdmin({ chips: novasFichas });
   }
 
   function renderizarNiveisAdmin(levels, forcar) {
@@ -468,7 +603,6 @@
       addonValue: parseNumeroAbreviado(document.getElementById("admin-input-addon").value),
       actionPrice: parseNumeroAbreviado(document.getElementById("admin-input-preco").value),
       dealerShare: parseNumeroAbreviado(document.getElementById("admin-input-dealer").value),
-      chipValues: document.getElementById("admin-input-fichas").value,
     };
   }
 
@@ -499,6 +633,209 @@
       var novosNiveis = adminEstado.tournament.levels.concat([{ sb: 0, bb: 0, ante: 0, minutes: 10, isBreak: false }]);
       salvarNiveisAdmin(novosNiveis);
     });
+
+    document.getElementById("admin-botao-add-ficha").addEventListener("click", function () {
+      var primeiroModelo = modelosFichaDisponiveis[0];
+      var primeiraCor = primeiroModelo && primeiroModelo.colors[0];
+      var novasFichas = adminEstado.tournament.chips.concat([{
+        value: 0,
+        model: primeiroModelo ? primeiroModelo.model : "",
+        color: primeiraCor ? primeiraCor.id : "",
+      }]);
+      salvarFichasAdmin(novasFichas);
+    });
+
+    document.getElementById("admin-botao-excluir-torneio").addEventListener("click", function () {
+      excluirTorneioComConfirmacao(adminTorneioId, adminEstado.tournament.name);
+    });
+  }
+
+  // ---------------------------------------------------------- configuração --
+  // Logo e modelos de ficha são globais (não por torneio) — moram direto em
+  // static/img, então "salvar" aqui é só mandar o arquivo pro servidor.
+
+  // Mini formulário "nome da cor + foto" pra acrescentar uma cor a um modelo que
+  // já existe (sem precisar recriar o modelo do zero).
+  function construirFormAddCorModelo(slugModelo) {
+    var form = el("div", "linha-ficha");
+
+    var nome = el("input");
+    nome.type = "text";
+    nome.placeholder = "Nome da nova cor";
+    form.appendChild(nome);
+
+    var arquivo = document.createElement("input");
+    arquivo.type = "file";
+    arquivo.accept = "image/*";
+    arquivo.title = "Foto de uma única ficha — não envie uma foto com várias fichas juntas.";
+    form.appendChild(arquivo);
+
+    var botao = el("button", "botao", "+ Adicionar cor");
+    botao.type = "button";
+    botao.addEventListener("click", function () {
+      var nomeCor = nome.value.trim();
+      var arquivoCor = arquivo.files[0];
+      if (!nomeCor || !arquivoCor) { Api.avisar("Preencha o nome e a foto da cor."); return; }
+      var corpo = new FormData();
+      corpo.append("nome", nomeCor);
+      corpo.append("arquivo", arquivoCor);
+      fetch("/api/config/chip-model/" + encodeURIComponent(slugModelo) + "/colors", { method: "POST", body: corpo })
+        .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+        .then(function () {
+          carregarModelosFicha().then(renderizarModelosConfig);
+          Api.avisar("Cor \"" + nomeCor + "\" adicionada.");
+        })
+        .catch(function () { Api.avisar("Não foi possível adicionar a cor. Tente novamente."); });
+    });
+    form.appendChild(botao);
+
+    return form;
+  }
+
+  function renderizarModelosConfig(lista) {
+    var container = document.getElementById("config-lista-modelos");
+    if (!container) return;
+    container.textContent = "";
+    if (!lista.length) {
+      container.appendChild(el("p", "rotulo", "Nenhum modelo cadastrado ainda."));
+      return;
+    }
+    lista.forEach(function (m) {
+      var bloco = el("div", "bloco-modelo-config");
+
+      var cabecalho = el("div", "linha-ficha");
+      cabecalho.appendChild(el("span", null, m.label + ":"));
+      var botaoRemoverModelo = el("button", "botao perigo", "Remover modelo");
+      botaoRemoverModelo.type = "button";
+      botaoRemoverModelo.style.marginLeft = "auto";
+      botaoRemoverModelo.addEventListener("click", function () {
+        if (!confirm("Remover o modelo \"" + m.label + "\" e todas as suas cores? Essa ação não pode ser desfeita.")) return;
+        fetch("/api/config/chip-model/" + encodeURIComponent(m.model), { method: "DELETE" })
+          .then(function (r) { if (!r.ok) throw new Error("falha"); })
+          .then(function () { carregarModelosFicha().then(renderizarModelosConfig); })
+          .catch(function () { Api.avisar("Não foi possível remover o modelo. Tente novamente."); });
+      });
+      cabecalho.appendChild(botaoRemoverModelo);
+      bloco.appendChild(cabecalho);
+
+      var linhaCores = el("div", "linha-ficha");
+      m.colors.forEach(function (cor) {
+        var item = el("div", "ficha-item-config");
+
+        var img = document.createElement("img");
+        img.className = "ficha-preview-admin";
+        img.src = caminhoImagemFicha(m.model, cor.id);
+        img.title = cor.label;
+        item.appendChild(img);
+
+        var botaoRemoverCor = el("button", "botao perigo", "x");
+        botaoRemoverCor.type = "button";
+        botaoRemoverCor.title = "Remover a cor \"" + cor.label + "\"";
+        botaoRemoverCor.addEventListener("click", function () {
+          if (!confirm("Remover a cor \"" + cor.label + "\" do modelo \"" + m.label + "\"?")) return;
+          fetch("/api/config/chip-model/" + encodeURIComponent(m.model) + "/colors/" + encodeURIComponent(cor.id), { method: "DELETE" })
+            .then(function (r) { if (!r.ok) throw new Error("falha"); })
+            .then(function () { carregarModelosFicha().then(renderizarModelosConfig); })
+            .catch(function () { Api.avisar("Não foi possível remover a cor. Tente novamente."); });
+        });
+        item.appendChild(botaoRemoverCor);
+
+        linhaCores.appendChild(item);
+      });
+      bloco.appendChild(linhaCores);
+      bloco.appendChild(construirFormAddCorModelo(m.model));
+      container.appendChild(bloco);
+    });
+  }
+
+  function entrarConfiguracao() {
+    carregarModelosFicha().then(renderizarModelosConfig);
+  }
+
+  // Linha avulsa de "nome da cor + foto" no formulário de novo modelo — não tem
+  // estado próprio sincronizado com o servidor, só existe até o clique em Salvar.
+  function criarLinhaCorNova() {
+    var linha = el("div", "linha-ficha");
+
+    var nome = el("input");
+    nome.type = "text";
+    nome.placeholder = "Nome da cor (ex: vermelha)";
+    linha.appendChild(nome);
+
+    var arquivo = document.createElement("input");
+    arquivo.type = "file";
+    arquivo.accept = "image/*";
+    arquivo.title = "Foto de uma única ficha — não envie uma foto com várias fichas juntas.";
+    linha.appendChild(arquivo);
+
+    var botaoRemover = el("button", "botao perigo", "x");
+    botaoRemover.type = "button";
+    botaoRemover.title = "Remover esta cor";
+    botaoRemover.addEventListener("click", function () {
+      var lista = document.getElementById("config-cores-lista");
+      if (lista.children.length <= 1) return; // precisa sobrar ao menos 1 cor
+      linha.remove();
+    });
+    linha.appendChild(botaoRemover);
+
+    linha._nomeInput = nome;
+    linha._arquivoInput = arquivo;
+    return linha;
+  }
+
+  function wireConfiguracao() {
+    document.getElementById("config-botao-enviar-logo").addEventListener("click", function () {
+      var input = document.getElementById("config-input-logo");
+      var arquivo = input.files[0];
+      if (!arquivo) { Api.avisar("Escolha um arquivo antes de enviar."); return; }
+      var corpo = new FormData();
+      corpo.append("arquivo", arquivo);
+      fetch("/api/config/logo", { method: "POST", body: corpo })
+        .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+        .then(function () {
+          document.getElementById("config-logo-atual").src = "img/lk-logo.png?t=" + Date.now();
+          input.value = "";
+        })
+        .catch(function () { Api.avisar("Não foi possível enviar a logo. Tente novamente."); });
+    });
+
+    var listaCores = document.getElementById("config-cores-lista");
+    listaCores.appendChild(criarLinhaCorNova());
+    listaCores.appendChild(criarLinhaCorNova());
+
+    document.getElementById("config-botao-add-cor").addEventListener("click", function () {
+      listaCores.appendChild(criarLinhaCorNova());
+    });
+
+    document.getElementById("config-botao-add-modelo").addEventListener("click", function () {
+      var nomeModelo = document.getElementById("config-modelo-nome").value.trim();
+      if (!nomeModelo) { Api.avisar("Dê um nome ao modelo."); return; }
+
+      var linhas = Array.prototype.slice.call(listaCores.children);
+      var corpo = new FormData();
+      corpo.append("nome", nomeModelo);
+      var algumaFaltando = false;
+      linhas.forEach(function (linha) {
+        var nomeCor = linha._nomeInput.value.trim();
+        var arquivoCor = linha._arquivoInput.files[0];
+        if (!nomeCor || !arquivoCor) { algumaFaltando = true; return; }
+        corpo.append("cor_nome", nomeCor);
+        corpo.append("cor_arquivo", arquivoCor);
+      });
+      if (algumaFaltando || !linhas.length) { Api.avisar("Preencha o nome e a foto de cada cor."); return; }
+
+      fetch("/api/config/chip-model", { method: "POST", body: corpo })
+        .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+        .then(function (novo) {
+          document.getElementById("config-modelo-nome").value = "";
+          listaCores.textContent = "";
+          listaCores.appendChild(criarLinhaCorNova());
+          listaCores.appendChild(criarLinhaCorNova());
+          carregarModelosFicha().then(renderizarModelosConfig);
+          Api.avisar("Modelo \"" + novo.label + "\" salvo.");
+        })
+        .catch(function () { Api.avisar("Não foi possível salvar o modelo. Tente novamente."); });
+    });
   }
 
   // ------------------------------------------------------------- roteador --
@@ -514,6 +851,7 @@
     else document.getElementById("tela-menu").classList.add("ativa");
     if (alvo === "gerente") entrarGerente();
     if (alvo === "admin") entrarAdmin();
+    if (alvo === "configuracao") entrarConfiguracao();
     // O alarme sonoro só deve tocar em quem está olhando o relógio (Timer/Gerente) —
     // sem isso, toda aba aberta tocaria junto e fora de sincronia.
     window.ROTA_ATUAL = alvo;
@@ -851,41 +1189,28 @@
     document.getElementById("timer-prize-pool").textContent = fmtMoeda(estado.totals.prizePool);
     document.getElementById("timer-jogadores-ativos").textContent = String(estado.totals.activeCount);
     document.getElementById("timer-stack-medio").textContent = fmtNumero(estado.totals.avgStack);
-    renderizarFichasTimer(estado.tournament.chipValues);
+    renderizarFichasTimer(estado.tournament.chips);
     renderizarPremiacaoTimer(estado);
   }
 
-  // Mapa dos valores de ficha cadastrados (Admin) para a foto real de cada uma.
-  var IMAGENS_FICHAS = {
-    100: "img/fichas/ficha-100.png",
-    500: "img/fichas/ficha-500.png",
-    1000: "img/fichas/ficha-1000.png",
-    5000: "img/fichas/ficha-5000.png",
-    25000: "img/fichas/ficha-25000.png",
-  };
+  var ultimoChipsRenderizado = null;
 
-  var ultimoChipValuesRenderizado = null;
-
-  function renderizarFichasTimer(chipValues) {
-    if (chipValues === ultimoChipValuesRenderizado) return; // são sempre as mesmas fotos, não precisa refazer a cada tick
-    ultimoChipValuesRenderizado = chipValues;
+  function renderizarFichasTimer(chips) {
+    var chave = JSON.stringify(chips || []);
+    if (chave === ultimoChipsRenderizado) return; // são sempre as mesmas fotos, não precisa refazer a cada tick
+    ultimoChipsRenderizado = chave;
 
     var container = document.getElementById("timer-fichas");
     if (!container) return;
     container.textContent = "";
-    (chipValues || "").split(",").forEach(function (texto) {
-      var digitos = texto.replace(/\D/g, "");
-      if (!digitos) return;
-      var numero = parseInt(digitos, 10);
+    (chips || []).forEach(function (ficha) {
       var item = el("div", "ficha-item");
-      var caminhoImagem = IMAGENS_FICHAS[numero];
-      if (caminhoImagem) {
-        var img = document.createElement("img");
-        img.src = caminhoImagem;
-        img.alt = "Ficha " + fmtNumero(numero);
-        item.appendChild(img);
-      }
-      item.appendChild(el("span", null, fmtNumero(numero)));
+      var img = document.createElement("img");
+      img.src = caminhoImagemFicha(ficha.model, ficha.color);
+      img.alt = "Ficha " + fmtNumero(ficha.value);
+      img.onerror = function () { img.style.display = "none"; }; // combinação sem foto cadastrada: só o texto
+      item.appendChild(img);
+      item.appendChild(el("span", null, fmtNumero(ficha.value)));
       container.appendChild(item);
     });
   }
@@ -920,14 +1245,13 @@
     var emRascunho = emModoRascunho();
     var tituloRascunho = "Selecione o torneio atual (não um rascunho) para controlar o timer";
 
-    ["timer-botao-playpause", "gerente-botao-playpause"].forEach(function (id) {
+    ["gerente-botao-playpause"].forEach(function (id) {
       var botao = document.getElementById(id);
       if (!botao) return;
       botao.textContent = torneio.status === "running" ? "⏸ Pausar" : "▶ Tocar";
-      var bloqueadoRascunho = id.indexOf("gerente-") === 0 && emRascunho;
-      var bloqueado = bloqueadoRascunho || (!torneio.configured && torneio.status !== "running");
+      var bloqueado = emRascunho || (!torneio.configured && torneio.status !== "running");
       botao.disabled = bloqueado;
-      botao.title = bloqueadoRascunho ? tituloRascunho : (bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "");
+      botao.title = emRascunho ? tituloRascunho : (bloqueado ? "Confirme a configuração do torneio no Admin antes de iniciar" : "");
     });
 
     ["gerente-botao-prev", "gerente-botao-next", "gerente-botao-mais1", "gerente-botao-menos1", "gerente-botao-reiniciar"].forEach(function (id) {
@@ -939,6 +1263,7 @@
   };
 
   function renderTudo(estado) {
+    aplicarTemaCor(estado.colorTheme);
     renderizarMenu(estado);
     renderizarTimerEstatico(estado);
     if (!emModoRascunho()) renderizarGerente(estado);
@@ -958,42 +1283,96 @@
 
   // ------------------------------------------------------------------- tema --
 
+  function temaEfetivoAtual() {
+    var atual = document.documentElement.getAttribute("data-theme");
+    return atual || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+
+  // Bolinha desliza pro lado da lua (escuro) ou do sol (claro) — a classe "escuro"
+  // controla a cor do trilho e a posição via CSS.
+  function atualizarIconeTema() {
+    var botao = document.getElementById("botao-tema");
+    if (!botao) return;
+    var escuro = temaEfetivoAtual() === "dark";
+    botao.classList.toggle("escuro", escuro);
+    botao.title = escuro ? "Tema escuro — clique para mudar pro claro" : "Tema claro — clique para mudar pro escuro";
+  }
+
   function aplicarTemaSalvo() {
     var salvo = null;
     try { salvo = localStorage.getItem("tema"); } catch (e) { /* sem storage */ }
     if (salvo) document.documentElement.setAttribute("data-theme", salvo);
+    atualizarIconeTema();
   }
 
   function alternarTema() {
-    var atual = document.documentElement.getAttribute("data-theme");
-    var atualEfetivo = atual || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-    var novo = atualEfetivo === "dark" ? "light" : "dark";
+    var novo = temaEfetivoAtual() === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", novo);
     try { localStorage.setItem("tema", novo); } catch (e) { /* sem storage */ }
+    atualizarIconeTema();
+  }
+
+  // --------------------------------------------------------------- tema de cor --
+  // Esquema de cores (Nord, Gruvbox...) é global ao sistema — diferente do claro/
+  // escuro, que é por aparelho. Sincroniza pelo mesmo snapshot/WS de sempre.
+
+  var TEMAS_COR = [
+    { id: "default", label: "Padrão (LK)", bg: "#13152a", destaque: "#8f7bd9" },
+    { id: "nord", label: "Nord", bg: "#2e3440", destaque: "#88c0d0" },
+    { id: "gruvbox", label: "Gruvbox Dark", bg: "#282828", destaque: "#fe8019" },
+    { id: "solarized", label: "Solarized Dark", bg: "#002b36", destaque: "#268bd2" },
+    { id: "rose-pine", label: "Rosé Pine", bg: "#191724", destaque: "#c4a7e7" },
+    { id: "one-dark", label: "One Dark Pro", bg: "#282c34", destaque: "#61afef" },
+  ];
+
+  function renderizarTemasConfig(temaAtual) {
+    var container = document.getElementById("config-lista-temas");
+    if (!container) return;
+    container.textContent = "";
+    TEMAS_COR.forEach(function (t) {
+      var card = el("button", "linha-tema" + (t.id === temaAtual ? " selecionado" : ""));
+      card.type = "button";
+
+      var amostra = el("span", "linha-tema-amostra");
+      amostra.style.background = t.bg;
+      var bolinha = el("span", "linha-tema-bolinha");
+      bolinha.style.background = t.destaque;
+      amostra.appendChild(bolinha);
+      card.appendChild(amostra);
+      card.appendChild(el("span", "linha-tema-nome", t.label));
+
+      card.addEventListener("click", function () {
+        fetch("/api/config/theme", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ theme: t.id }),
+        })
+          .then(function (r) { if (!r.ok) throw new Error("falha"); return r.json(); })
+          .then(function () { aplicarTemaCor(t.id); })
+          .catch(function () { Api.avisar("Não foi possível trocar o tema. Tente novamente."); });
+      });
+      container.appendChild(card);
+    });
+  }
+
+  function aplicarTemaCor(tema) {
+    if (!tema || tema === "default") document.documentElement.removeAttribute("data-color-theme");
+    else document.documentElement.setAttribute("data-color-theme", tema);
+    renderizarTemasConfig(tema || "default");
   }
 
   // --------------------------------------------------------------- wiring --
 
   function wirePlayPauseButtons() {
-    [["timer-botao-playpause"], ["gerente-botao-playpause"]].forEach(function (arr) {
-      var botao = document.getElementById(arr[0]);
-      if (!botao) return;
-      botao.addEventListener("click", function () {
-        var estado = Api.obterEstado();
-        var rodando = estado && estado.tournament.status === "running";
-        var url = rodando ? "/api/timer/pause" : "/api/timer/play";
-        Api.enviarAcao(url, "POST", {});
-      });
+    document.getElementById("gerente-botao-playpause").addEventListener("click", function () {
+      var estado = Api.obterEstado();
+      var rodando = estado && estado.tournament.status === "running";
+      var url = rodando ? "/api/timer/pause" : "/api/timer/play";
+      Api.enviarAcao(url, "POST", {});
     });
-    [["timer-botao-next"], ["gerente-botao-next"]].forEach(function (arr) {
-      var botao = document.getElementById(arr[0]);
-      if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/next", "POST", {}); });
-    });
-    [["timer-botao-prev"], ["gerente-botao-prev"]].forEach(function (arr) {
-      var botao = document.getElementById(arr[0]);
-      if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/prev", "POST", {}); });
-    });
-    [["timer-botao-mais1", 1], ["gerente-botao-mais1", 1], ["timer-botao-menos1", -1], ["gerente-botao-menos1", -1]].forEach(function (arr) {
+    document.getElementById("gerente-botao-next").addEventListener("click", function () { Api.enviarAcao("/api/timer/next", "POST", {}); });
+    document.getElementById("gerente-botao-prev").addEventListener("click", function () { Api.enviarAcao("/api/timer/prev", "POST", {}); });
+    [["gerente-botao-mais1", 1], ["gerente-botao-menos1", -1]].forEach(function (arr) {
       var botao = document.getElementById(arr[0]);
       if (botao) botao.addEventListener("click", function () { Api.enviarAcao("/api/timer/adjust", "POST", { deltaMinutes: arr[1] }); });
     });
@@ -1040,18 +1419,6 @@
     document.getElementById("botao-tema").addEventListener("click", alternarTema);
   }
 
-  function wireBotaoAtivarSom() {
-    // Um clique no Admin (outro aparelho) não libera o áudio na tela do Timer (TV) —
-    // cada carregamento de página precisa do próprio gesto do usuário, por causa da
-    // política de autoplay do navegador. Por isso não fica "lembrado" entre reloads.
-    var botao = document.getElementById("timer-botao-ativar-som");
-    if (!botao) return;
-    botao.addEventListener("click", function () {
-      Audio30.destravar();
-      botao.style.display = "none";
-    });
-  }
-
   // ------------------------------------------------------------------ boot --
 
   document.addEventListener("click", function destravarUmaVez() {
@@ -1064,9 +1431,9 @@
   wireGerenteForm();
   wireAdminPainel();
   wireTema();
-  wireBotaoAtivarSom();
   wirePremiacao();
   wireSeletorTorneio();
+  wireConfiguracao();
 
   Api.aoAtualizarEstado(renderTudo);
   Api.aoAtualizarConexao(atualizarSeloConexao);

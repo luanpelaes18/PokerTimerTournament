@@ -1,0 +1,37 @@
+{
+  "modelo-1": {
+    "label": "LKpoker",
+    "colors": {
+      "cinza": "Cinza",
+      "roxo": "Roxo",
+      "amarelo": "Amarelo",
+      "azul": "Azul",
+      "rosa": "Rosa"
+    }
+  },
+  "modelo-2": {
+    "label": "Modelo 2",
+    "colors": {
+      "cinza": "Cinza",
+      "roxo": "Roxo",
+      "amarelo": "Amarelo",
+      "azul": "Azul",
+      "rosa": "Rosa",
+      "verde": "verde",
+      "azul-escura": "azul-escura",
+      "branca": "branca",
+      "laranja": "laranja",
+      "vermelha": "vermelha"
+    }
+  },
+  "modelo-3": {
+    "label": "Modelo 1",
+    "colors": {
+      "cinza": "Cinza",
+      "roxo": "Roxo",
+      "amarelo": "Amarelo",
+      "azul": "Azul",
+      "rosa": "Rosa"
+    }
+  }
+}

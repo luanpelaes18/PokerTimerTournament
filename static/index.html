@@ -22,13 +22,13 @@
       </div>
       <div class="nav-telas">
         <span id="selo-conexao" class="selo-conexao">conectando…</span>
-        <button class="botao" id="botao-tema" type="button">Tema</button>
       </div>
     </div>
     <div class="grade-menu">
       <a class="cartao" href="#gerente">Gerente<span>Jogadores, timer, pagamentos e finalização</span></a>
       <a class="cartao" href="#timer">Timer<span>Relógio para a TV/monitor</span></a>
       <a class="cartao" href="#admin">Admin<span>Cadastro de torneios e histórico</span></a>
+      <a class="cartao" href="#configuracao">Configuração<span>Logo e modelos de ficha do sistema</span></a>
     </div>
   </section>
 
@@ -98,8 +98,6 @@
       <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
     </div>
 
-    <button class="botao primario" id="timer-botao-ativar-som" type="button" style="display:block; margin:16px auto; font-size:1.1rem; padding:14px 28px;">🔊 Toque aqui para ativar o som do alarme</button>
-
     <div class="timer-grade">
       <div class="timer-fichas" id="timer-fichas"></div>
 
@@ -117,14 +115,6 @@
 
         <p class="timer-prox" id="timer-premio-titulo" style="margin-top:20px">Previsão de premiação</p>
         <div class="timer-stats" id="timer-premio-lista"></div>
-
-        <div class="controles-timer">
-          <button class="botao" id="timer-botao-prev" type="button">⏮ Anterior</button>
-          <button class="botao primario" id="timer-botao-playpause" type="button">▶ Tocar</button>
-          <button class="botao" id="timer-botao-next" type="button">Próximo ⏭</button>
-          <button class="botao" id="timer-botao-menos1" type="button">-1 min</button>
-          <button class="botao" id="timer-botao-mais1" type="button">+1 min</button>
-        </div>
       </div>
     </div>
   </section>
@@ -159,9 +149,13 @@
             <label class="campo">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
             <label class="campo">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
             <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
-            <label class="campo campo-largo">Valores de ficha disponíveis<input type="text" id="admin-input-fichas"></label>
           </form>
           <button class="botao primario" id="admin-botao-salvar" type="button">Salvar</button>
+
+          <h3 style="margin-top:20px">Fichas cadastradas</h3>
+          <p class="rotulo">Valor e modelo visual de cada ficha física que você tem em casa — define o que aparece na coluna de fichas da tela Timer.</p>
+          <div id="admin-lista-fichas"></div>
+          <button class="botao" id="admin-botao-add-ficha" type="button">+ Adicionar ficha</button>
 
           <h3 style="margin-top:20px">Estrutura de níveis</h3>
           <table class="lista niveis">
@@ -169,10 +163,61 @@
             <tbody id="admin-lista-niveis"></tbody>
           </table>
           <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
+
+          <button class="botao perigo" id="admin-botao-excluir-torneio" type="button" style="margin-top:24px">Excluir torneio</button>
         </div>
 
         <div id="admin-detalhe-relatorio" style="display:none"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- #configuracao -->
+  <section id="tela-configuracao" class="tela">
+    <div class="topo">
+      <h1>Configuração</h1>
+      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+    </div>
+
+    <div class="cartao">
+      <h3 style="margin-top:0">Tema de cores</h3>
+      <p class="rotulo">
+        Esquema de cores do sistema inteiro (separado do interruptor claro/escuro).
+        "Padrão" é o roxo/índigo original — todos os temas têm variante clara e escura,
+        e continuam respeitando o interruptor de cada tela.
+      </p>
+      <div id="config-lista-temas"></div>
+    </div>
+
+    <div class="cartao" style="margin-top:16px">
+      <h3 style="margin-top:0">Logo do sistema</h3>
+      <p class="rotulo">
+        Usada no menu e como marca d'água de fundo em todas as telas. Envie um PNG com fundo
+        transparente, de preferência quadrado (ex: 512×512px), com a arte bem enquadrada e sem
+        muita margem em branco ao redor — senão a marca d'água fica pequena ou apagada.
+      </p>
+      <img id="config-logo-atual" src="img/lk-logo.png" alt="Logo atual">
+      <input type="file" id="config-input-logo" accept="image/*">
+      <button class="botao primario" id="config-botao-enviar-logo" type="button" style="margin-top:8px">Enviar logo</button>
+    </div>
+
+    <div class="cartao" style="margin-top:16px">
+      <h3 style="margin-top:0">Modelos de ficha</h3>
+      <p class="rotulo">
+        Cada modelo tem o nome e as cores que você quiser — dê um nome ao modelo, depois um
+        nome e uma foto pra cada cor. <strong>Cada foto deve conter uma única ficha</strong> — a
+        tela já recorta em círculo na exibição, então não precisa recortar antes, mas se a foto
+        tiver várias fichas juntas (lado a lado, por exemplo) ela não separa sozinha: vai
+        aparecer tudo junto numa "cor" só. Tirando foto, fotografe uma ficha por vez; se já tiver
+        uma imagem com várias, recorte-a em fotos separadas antes de enviar.
+      </p>
+      <div id="config-lista-modelos"></div>
+
+      <h3 style="margin-top:20px">Adicionar modelo</h3>
+      <label class="campo campo-largo">Nome do modelo<input type="text" id="config-modelo-nome" placeholder="ex: LKpoker"></label>
+      <div id="config-cores-lista" style="margin-top:12px"></div>
+      <button class="botao" id="config-botao-add-cor" type="button" style="margin-top:8px">+ Adicionar cor</button>
+      <button class="botao primario" id="config-botao-add-modelo" type="button" style="margin-top:12px; display:block">Salvar novo modelo</button>
     </div>
   </section>
 
@@ -185,6 +230,17 @@
   </section>
 
   <div class="toast" id="toast"></div>
+
+  <button class="interruptor-tema" id="botao-tema" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro">
+    <svg class="interruptor-tema-icone interruptor-tema-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+    </svg>
+    <svg class="interruptor-tema-icone interruptor-tema-lua" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </svg>
+    <span class="interruptor-tema-bolinha"></span>
+  </button>
 
   <script src="audio.js"></script>
   <script src="api.js"></script>

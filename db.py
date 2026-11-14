@@ -27,7 +27,17 @@ NIVEIS_PADRAO = [
     {"sb": 5000, "bb": 10000, "ante": 0, "minutes": 10, "isBreak": False},
 ]
 
-CHIP_VALUES_PADRAO = "100, 500, 1.000, 5.000, 25.000"
+# Cor de cada valor nas fichas físicas reais (usada só como palpite ao migrar
+# dados antigos — value e color são independentes dali em diante).
+COR_POR_VALOR_PADRAO = {100: "cinza", 500: "roxo", 1000: "amarelo", 5000: "azul", 25000: "rosa"}
+
+CHIPS_PADRAO = [
+    {"value": 100, "model": "modelo-1", "color": "cinza"},
+    {"value": 500, "model": "modelo-1", "color": "roxo"},
+    {"value": 1000, "model": "modelo-1", "color": "amarelo"},
+    {"value": 5000, "model": "modelo-1", "color": "azul"},
+    {"value": 25000, "model": "modelo-1", "color": "rosa"},
+]
 
 
 def agora_iso():
@@ -63,7 +73,7 @@ def inicializar():
             addon_value INTEGER NOT NULL,
             action_price REAL NOT NULL,
             dealer_share REAL NOT NULL,
-            chip_values TEXT NOT NULL,
+            chips_json TEXT NOT NULL DEFAULT '[]',
             configured INTEGER NOT NULL DEFAULT 0,
             payout_json TEXT NOT NULL DEFAULT '[null, null, null]',
             payout_confirmed INTEGER NOT NULL DEFAULT 0,
@@ -130,6 +140,50 @@ def _migrar(con):
     if "payout_confirmed" not in colunas_torneios:
         con.execute("ALTER TABLE tournaments ADD COLUMN payout_confirmed INTEGER NOT NULL DEFAULT 0")
         con.commit()
+    if "chips_json" not in colunas_torneios:
+        con.execute("ALTER TABLE tournaments ADD COLUMN chips_json TEXT")
+        if "chip_values" in colunas_torneios:
+            # Veio do esquema antigo (texto livre "100, 500, ...") — migra pra lista
+            # de {value, model}, todas com o modelo 1 (único que existia até então).
+            for row in con.execute("SELECT id, chip_values FROM tournaments"):
+                valores = []
+                for pedaco in (row["chip_values"] or "").split(","):
+                    digitos = "".join(c for c in pedaco if c.isdigit())
+                    if digitos:
+                        numero = int(digitos)
+                        valores.append({"value": numero, "model": "modelo-1", "color": COR_POR_VALOR_PADRAO.get(numero, "cinza")})
+                con.execute(
+                    "UPDATE tournaments SET chips_json = ? WHERE id = ?",
+                    (json.dumps(valores or CHIPS_PADRAO), row["id"]),
+                )
+        else:
+            con.execute("UPDATE tournaments SET chips_json = ? WHERE chips_json IS NULL", (json.dumps(CHIPS_PADRAO),))
+        con.commit()
+
+    # Modelo e cor passaram a ser independentes do valor — bancos de uma versão
+    # anterior têm fichas sem "color" (vinha implícito do valor). Preenche com o
+    # palpite óbvio (cor que aquele valor tinha nas fichas físicas reais).
+    for row in con.execute("SELECT id, chips_json FROM tournaments"):
+        fichas = json.loads(row["chips_json"] or "[]")
+        se_mudou = False
+        for f in fichas:
+            if "color" not in f:
+                f["color"] = COR_POR_VALOR_PADRAO.get(f.get("value"), "cinza")
+                se_mudou = True
+            # Modelo passou a ser um nome escolhido pelo usuário (slug), não mais
+            # um número fixo de 1 a 3 — bancos antigos ainda guardam o número.
+            if isinstance(f.get("model"), int):
+                f["model"] = "modelo-" + str(f["model"])
+                se_mudou = True
+        if se_mudou:
+            con.execute("UPDATE tournaments SET chips_json = ? WHERE id = ?", (json.dumps(fichas), row["id"]))
+    con.commit()
+
+    # Coluna antiga (substituída por chips_json) ainda tinha NOT NULL sem default —
+    # como criar_torneio() não a preenche mais, criar torneio quebrava. Remove de vez.
+    if "chip_values" in colunas_torneios:
+        con.execute("ALTER TABLE tournaments DROP COLUMN chip_values")
+        con.commit()
 
     colunas_participantes = {row["name"] for row in con.execute("PRAGMA table_info(participants)")}
     if "paid_amount" not in colunas_participantes:
@@ -162,7 +216,7 @@ def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):
 
 def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
                    addon_value=2000, action_price=20.0, dealer_share=5.0,
-                   chip_values=CHIP_VALUES_PADRAO, tornar_atual=True):
+                   chips=None, tornar_atual=True):
     tid = novo_id()
     con.execute(
         """
@@ -170,14 +224,15 @@ def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
             id, name, status, levels_json, current_level_index,
             elapsed_before_ref, reference_at, muted,
             entry_value, reentry_value, addon_value,
-            action_price, dealer_share, chip_values,
+            action_price, dealer_share, chips_json, payout_json,
             created_at, finished_at
-        ) VALUES (?, ?, 'paused', ?, 0, 0, NULL, 0, ?, ?, ?, ?, ?, ?, ?, NULL)
+        ) VALUES (?, ?, 'paused', ?, 0, 0, NULL, 0, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
         """,
         (
             tid, nome, json.dumps(levels or NIVEIS_PADRAO),
             entry_value, reentry_value, addon_value,
-            action_price, dealer_share, chip_values,
+            action_price, dealer_share, json.dumps(chips or CHIPS_PADRAO),
+            json.dumps([None, None, None]),
             agora_iso(),
         ),
     )
@@ -199,3 +254,24 @@ def tournament_id_atual(con):
         "SELECT value FROM settings WHERE key = 'current_tournament_id'"
     ).fetchone()
     return row["value"] if row else None
+
+
+# Paleta de cores do sistema inteiro (não por torneio) — "default" é o roxo/índigo
+# original, sempre disponível mesmo sem linha na tabela settings.
+TEMAS_COR_VALIDOS = ["default", "nord", "gruvbox", "solarized", "rose-pine", "one-dark"]
+
+
+def cor_tema_atual(con):
+    row = con.execute("SELECT value FROM settings WHERE key = 'color_theme'").fetchone()
+    return row["value"] if row and row["value"] in TEMAS_COR_VALIDOS else "default"
+
+
+def definir_cor_tema(con, tema):
+    con.execute(
+        """
+        INSERT INTO settings (key, value) VALUES ('color_theme', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (tema,),
+    )
+    con.commit()

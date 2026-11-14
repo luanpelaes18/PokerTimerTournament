@@ -1,4 +1,7 @@
-/* Paleta da identidade "LK" (lk-poker-identidade-visual) — violeta/índigo/ciano. */
+/* Paleta da identidade "LK" (lk-poker-identidade-visual) — violeta/índigo/ciano.
+   Esse é o tema de cores "default"; os outros (Nord, Gruvbox...) ficam definidos
+   mais abaixo em blocos :root[data-color-theme="..."], que entram por cima deste
+   quando a pessoa escolhe um outro tema na tela Configuração. */
 :root {
   --bg: #13152a;
   --bg-elevado: #2a2a5a;
@@ -6,14 +9,15 @@
   --texto: #f2e9ff;
   --texto-fraco: #a79bd0;
   --destaque: #8f7bd9;
+  --destaque-texto: #f2e9ff;
   --verde: #3ddc84;
   --vermelho: #ff5d5d;
   --indigo: #1a1f5a;
-  --deep: #2b124c;
   --violet: #8f7bd9;
   --blue: #3f6bd4;
-  --cyan: #6ce4ff;
   --fonte: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --logo-marca-opacidade: 0.18;
+  --logo-marca-filtro: brightness(1.5);
 }
 
 :root[data-theme="light"] {
@@ -25,6 +29,7 @@
   --destaque: #5b3fa6;
   --verde: #1e9c5a;
   --vermelho: #c7362f;
+  --logo-marca-filtro: brightness(0.6) saturate(1.15);
 }
 
 @media (prefers-color-scheme: light) {
@@ -37,6 +42,192 @@
     --destaque: #5b3fa6;
     --verde: #1e9c5a;
     --vermelho: #c7362f;
+    --logo-marca-filtro: brightness(0.6) saturate(1.15);
+  }
+}
+
+/* Temas de cor alternativos (escolhidos na tela Configuração, valem pro sistema
+   inteiro). Cada um tem sua própria variante clara — o bloco [data-theme="light"]
+   combinado tem mais especificidade que o claro/escuro genérico, então ganha sem
+   depender de ordem no arquivo; o bloco em @media cobre quem segue o tema do
+   sistema (sem escolher manualmente) com o SO no claro. */
+:root[data-color-theme="nord"] {
+  --bg: #2e3440;
+  --bg-elevado: #3b4252;
+  --borda: #4c566a;
+  --texto: #eceff4;
+  --texto-fraco: #d8dee9;
+  --destaque: #88c0d0;
+  --destaque-texto: #2e3440;
+  --verde: #a3be8c;
+  --vermelho: #bf616a;
+  --indigo: #434c5e;
+  --violet: #5e81ac;
+  --blue: #88c0d0;
+}
+:root[data-color-theme="nord"][data-theme="light"] {
+  --bg: #eceff4;
+  --bg-elevado: #e5e9f0;
+  --borda: #d8dee9;
+  --texto: #2e3440;
+  --texto-fraco: #4c566a;
+  --destaque: #5e81ac;
+  --destaque-texto: #eceff4;
+  --verde: #6a8f55;
+  --vermelho: #bf616a;
+  --indigo: #4c566a;
+  --violet: #5e81ac;
+  --blue: #81a1c1;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-color-theme="nord"]:not([data-theme="dark"]) {
+    --bg: #eceff4; --bg-elevado: #e5e9f0; --borda: #d8dee9; --texto: #2e3440; --texto-fraco: #4c566a;
+    --destaque: #5e81ac; --destaque-texto: #eceff4; --verde: #6a8f55; --vermelho: #bf616a;
+    --indigo: #4c566a; --violet: #5e81ac; --blue: #81a1c1;
+  }
+}
+
+:root[data-color-theme="gruvbox"] {
+  --bg: #282828;
+  --bg-elevado: #3c3836;
+  --borda: #504945;
+  --texto: #ebdbb2;
+  --texto-fraco: #a89984;
+  --destaque: #fe8019;
+  --destaque-texto: #282828;
+  --verde: #b8bb26;
+  --vermelho: #fb4934;
+  --indigo: #504945;
+  --violet: #fe8019;
+  --blue: #fabd2f;
+}
+:root[data-color-theme="gruvbox"][data-theme="light"] {
+  --bg: #fbf1c7;
+  --bg-elevado: #ebdbb2;
+  --borda: #d5c4a1;
+  --texto: #3c3836;
+  --texto-fraco: #7c6f64;
+  --destaque: #af3a03;
+  --destaque-texto: #fbf1c7;
+  --verde: #79740e;
+  --vermelho: #9d0006;
+  --indigo: #3c3836;
+  --violet: #af3a03;
+  --blue: #9d0006;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-color-theme="gruvbox"]:not([data-theme="dark"]) {
+    --bg: #fbf1c7; --bg-elevado: #ebdbb2; --borda: #d5c4a1; --texto: #3c3836; --texto-fraco: #7c6f64;
+    --destaque: #af3a03; --destaque-texto: #fbf1c7; --verde: #79740e; --vermelho: #9d0006;
+    --indigo: #3c3836; --violet: #af3a03; --blue: #9d0006;
+  }
+}
+
+:root[data-color-theme="solarized"] {
+  --bg: #002b36;
+  --bg-elevado: #073642;
+  --borda: #586e75;
+  --texto: #93a1a1;
+  --texto-fraco: #839496;
+  --destaque: #268bd2;
+  --destaque-texto: #fdf6e3;
+  --verde: #859900;
+  --vermelho: #dc322f;
+  --indigo: #586e75;
+  --violet: #268bd2;
+  --blue: #2aa198;
+}
+:root[data-color-theme="solarized"][data-theme="light"] {
+  --bg: #fdf6e3;
+  --bg-elevado: #eee8d5;
+  --borda: #93a1a1;
+  --texto: #586e75;
+  --texto-fraco: #657b83;
+  --destaque: #268bd2;
+  --destaque-texto: #fdf6e3;
+  --verde: #859900;
+  --vermelho: #dc322f;
+  --indigo: #586e75;
+  --violet: #268bd2;
+  --blue: #2aa198;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-color-theme="solarized"]:not([data-theme="dark"]) {
+    --bg: #fdf6e3; --bg-elevado: #eee8d5; --borda: #93a1a1; --texto: #586e75; --texto-fraco: #657b83;
+    --destaque: #268bd2; --destaque-texto: #fdf6e3; --verde: #859900; --vermelho: #dc322f;
+    --indigo: #586e75; --violet: #268bd2; --blue: #2aa198;
+  }
+}
+
+:root[data-color-theme="rose-pine"] {
+  --bg: #191724;
+  --bg-elevado: #1f1d2e;
+  --borda: #403d52;
+  --texto: #e0def4;
+  --texto-fraco: #908caa;
+  --destaque: #c4a7e7;
+  --destaque-texto: #191724;
+  --verde: #31748f;
+  --vermelho: #eb6f92;
+  --indigo: #403d52;
+  --violet: #c4a7e7;
+  --blue: #ebbcba;
+}
+:root[data-color-theme="rose-pine"][data-theme="light"] {
+  --bg: #faf4ed;
+  --bg-elevado: #fffaf3;
+  --borda: #dfdad9;
+  --texto: #575279;
+  --texto-fraco: #797593;
+  --destaque: #286983;
+  --destaque-texto: #faf4ed;
+  --verde: #286983;
+  --vermelho: #b4637a;
+  --indigo: #575279;
+  --violet: #286983;
+  --blue: #907aa9;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-color-theme="rose-pine"]:not([data-theme="dark"]) {
+    --bg: #faf4ed; --bg-elevado: #fffaf3; --borda: #dfdad9; --texto: #575279; --texto-fraco: #797593;
+    --destaque: #286983; --destaque-texto: #faf4ed; --verde: #286983; --vermelho: #b4637a;
+    --indigo: #575279; --violet: #286983; --blue: #907aa9;
+  }
+}
+
+:root[data-color-theme="one-dark"] {
+  --bg: #282c34;
+  --bg-elevado: #2c313c;
+  --borda: #3e4451;
+  --texto: #abb2bf;
+  --texto-fraco: #6b7280;
+  --destaque: #61afef;
+  --destaque-texto: #282c34;
+  --verde: #98c379;
+  --vermelho: #e06c75;
+  --indigo: #3e4451;
+  --violet: #61afef;
+  --blue: #c678dd;
+}
+:root[data-color-theme="one-dark"][data-theme="light"] {
+  --bg: #fafafa;
+  --bg-elevado: #ffffff;
+  --borda: #e5e5e6;
+  --texto: #383a42;
+  --texto-fraco: #a0a1a7;
+  --destaque: #4078f2;
+  --destaque-texto: #fafafa;
+  --verde: #50a14f;
+  --vermelho: #e45649;
+  --indigo: #383a42;
+  --violet: #4078f2;
+  --blue: #a626a4;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-color-theme="one-dark"]:not([data-theme="dark"]) {
+    --bg: #fafafa; --bg-elevado: #ffffff; --borda: #e5e5e6; --texto: #383a42; --texto-fraco: #a0a1a7;
+    --destaque: #4078f2; --destaque-texto: #fafafa; --verde: #50a14f; --vermelho: #e45649;
+    --indigo: #383a42; --violet: #4078f2; --blue: #a626a4;
   }
 }
 
@@ -53,8 +244,18 @@ body {
   overflow-x: hidden;
 }
 
-.tela { display: none; min-height: 100vh; padding: 16px; }
+.tela { display: none; min-height: 100vh; padding: 16px; position: relative; }
 .tela.ativa { display: block; }
+.tela::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: url("img/lk-logo.png") center 60% / min(85vw, 760px) no-repeat;
+  opacity: var(--logo-marca-opacidade);
+  filter: var(--logo-marca-filtro);
+  pointer-events: none;
+}
 
 .topo {
   display: flex;
@@ -71,7 +272,7 @@ body {
 .logo-menu { width: 48px; height: 48px; flex-shrink: 0; object-fit: contain; }
 .marca-menu h1 { font-size: 1.3rem; color: var(--texto); }
 
-.nav-telas { display: flex; gap: 8px; flex-wrap: wrap; }
+.nav-telas { display: flex; gap: 8px; flex-wrap: wrap; margin-right: 60px; }
 
 a.botao, button.botao {
   display: inline-flex;
@@ -89,7 +290,7 @@ a.botao, button.botao {
 
 button.botao.primario {
   background: linear-gradient(135deg, var(--violet), var(--blue));
-  color: #f2e9ff;
+  color: var(--destaque-texto);
   border-color: transparent;
   font-weight: 600;
   box-shadow: 0 0 16px color-mix(in srgb, var(--violet) 50%, transparent);
@@ -125,17 +326,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .grade-menu a.cartao span { display: block; font-size: 0.85rem; color: var(--texto-fraco); font-weight: 400; margin-top: 6px; }
 
 /* ---- Timer ---- */
-#tela-timer { position: relative; }
-#tela-timer::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: url("img/lk-logo.png") center 60% / min(85vw, 760px) no-repeat;
-  opacity: 0.08;
-  pointer-events: none;
-}
-
 .timer-grade { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 28px; }
 .timer-principal { flex: 1 1 480px; min-width: 0; }
 
@@ -146,6 +336,47 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 760px) {
   .timer-fichas { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; order: 2; }
 }
+
+.linha-ficha { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.linha-ficha input, .linha-ficha select {
+  background: var(--bg);
+  border: 1px solid var(--borda);
+  color: var(--texto);
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.linha-ficha input[type="text"] { width: 140px; }
+.linha-ficha input[type="file"] { flex: 1 1 160px; min-width: 0; }
+.ficha-preview-admin { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid var(--borda); flex-shrink: 0; }
+
+.bloco-modelo-config { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--borda); }
+.bloco-modelo-config:last-child { border-bottom: none; margin-bottom: 0; }
+.ficha-item-config { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ficha-item-config button { padding: 2px 6px; font-size: 0.75rem; }
+
+#config-logo-atual { max-width: 160px; max-height: 160px; display: block; margin-bottom: 12px; }
+
+#config-lista-temas { display: flex; flex-wrap: wrap; gap: 10px; }
+.linha-tema {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 92px;
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--bg);
+  color: var(--texto);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-family: inherit;
+}
+.linha-tema.selecionado { border-color: var(--destaque); box-shadow: 0 0 0 2px color-mix(in srgb, var(--destaque) 40%, transparent); }
+.linha-tema-amostra { position: relative; width: 100%; height: 36px; border-radius: 6px; display: block; }
+.linha-tema-bolinha { position: absolute; bottom: 4px; right: 4px; width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.25); }
+.linha-tema-nome { text-align: center; }
 
 .timer-rotulo { text-align: center; color: var(--texto-fraco); font-size: 1.1rem; margin-bottom: 4px; }
 .timer-relogio {
@@ -307,6 +538,52 @@ table.niveis td, table.niveis th { text-align: center; }
   z-index: 50;
 }
 .toast.visivel { opacity: 1; }
+
+/* Interruptor estilo "day/night switch" minimalista: trilho + bolinha deslizante,
+   sol e lua fixos em cada ponta. Fica flutuando no canto superior direito em
+   qualquer tela, por isso .nav-telas reserva espaço (margin-right) pra não colidir. */
+.interruptor-tema {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 40;
+  width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--borda);
+  padding: 0;
+  cursor: pointer;
+  background: #d7dbe3;
+  transition: background 0.2s;
+}
+.interruptor-tema.escuro {
+  background: #20232f;
+  border-color: #3a3f55;
+}
+
+.interruptor-tema-icone {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.interruptor-tema-sol { left: 7px; color: #e8a33d; }
+.interruptor-tema-lua { right: 7px; color: #aab4e6; }
+
+.interruptor-tema-bolinha {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s;
+}
+.interruptor-tema.escuro .interruptor-tema-bolinha { transform: translateX(24px); }
 
 .selo-conexao { font-size: 0.78rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--borda); color: var(--texto-fraco); }
 .selo-conexao.online { color: var(--verde); border-color: var(--verde); }
