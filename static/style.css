@@ -3,21 +3,21 @@
    mais abaixo em blocos :root[data-color-theme="..."], que entram por cima deste
    quando a pessoa escolhe um outro tema na tela Configuração. */
 :root {
-  --bg: #13152a;
-  --bg-elevado: #2a2a5a;
-  --borda: #4b2e83;
-  --texto: #f2e9ff;
-  --texto-fraco: #a79bd0;
-  --destaque: #8f7bd9;
-  --destaque-texto: #f2e9ff;
-  --verde: #3ddc84;
-  --vermelho: #ff5d5d;
-  --indigo: #1a1f5a;
-  --violet: #8f7bd9;
-  --blue: #3f6bd4;
+  --bg: #13152a;             /* fundo da página */
+  --bg-elevado: #2a2a5a;      /* fundo dos "cartões" (.cartao), mais claro que --bg pra dar profundidade */
+  --borda: #4b2e83;            /* cor das bordas de inputs, cartões, botões */
+  --texto: #f2e9ff;              /* cor do texto principal */
+  --texto-fraco: #a79bd0;          /* cor de texto secundário/rótulos (.rotulo), mais apagada */
+  --destaque: #8f7bd9;                /* cor de ênfase (botões primários, bordas selecionadas) */
+  --destaque-texto: #f2e9ff;            /* cor do TEXTO em cima de --destaque — precisa de bom contraste */
+  --verde: #3ddc84;                       /* cor de sucesso/positivo (ex: "pago", "ativo") */
+  --vermelho: #ff5d5d;                      /* cor de perigo/negativo (ex: botão "Remover", "eliminado") */
+  --indigo: #1a1f5a;                          /* fundo dos botões comuns (.botao, não-primário) */
+  --violet: #8f7bd9;                            /* primeira cor do degradê do botão primário */
+  --blue: #3f6bd4;                                /* segunda cor do degradê do botão primário */
   --fonte: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --logo-marca-opacidade: 0.18;
-  --logo-marca-filtro: brightness(1.5);
+  --logo-marca-opacidade: 0.18;   /* o quão visível é a logo de fundo (marca d'água) em cada tela */
+  --logo-marca-filtro: brightness(1.5);  /* ajuste de brilho da marca d'água — cada tema/modo define o seu */
 }
 
 :root[data-theme="light"] {
@@ -323,7 +323,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-weight: 600;
 }
 
-.grade-menu a.cartao span { display: block; font-size: 0.85rem; color: var(--texto-fraco); font-weight: 400; margin-top: 6px; }
+.grade-menu a.cartao .cartao-desc { display: block; font-size: 0.85rem; color: var(--texto-fraco); font-weight: 400; margin-top: 6px; }
 
 /* ---- Timer ---- */
 .timer-grade { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 28px; }

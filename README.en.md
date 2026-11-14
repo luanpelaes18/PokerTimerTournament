@@ -4,7 +4,7 @@
 
 A poker tournament control system for home games: tournament setup (chip values, prices, blind structure, payouts), player management (rebuy, add-on, re-entry, payments), and a tournament clock kept in sync in real time across multiple devices on the same network — great for keeping a phone as the control and a TV/monitor showing only the clock for the players.
 
-Four screens: **Admin** (tournament setup and history), **Manager** (players, timer and finalization), **Timer** (clock display for the TV/monitor), and **Settings** (logo, chip models and color theme — all global, shared across every tournament).
+Four screens: **Admin** (tournament setup and history), **Manager** (players, timer and finalization), **Timer** (clock display for the TV/monitor), and **Settings** (logo, chip models, color theme and language — all global, shared across every tournament).
 
 Stack: Python (FastAPI + WebSocket) + SQLite, plain HTML/CSS/JS frontend served by the backend itself. No cloud, no external account — it runs locally on your network during the game.
 
@@ -30,7 +30,7 @@ Then open `http://<that-ip>:8000` on the other devices. Direct routes:
 - `http://<ip>:8000/#admin` — set up tournaments (name, values, chips, payouts, level structure), view past ones, and delete tournaments created by mistake
 - `http://<ip>:8000/#gerente` — pick/activate the tournament, register players, rebuy/add-on/re-entry/payment, control the timer and finalize
 - `http://<ip>:8000/#timer` — big clock for the TV/monitor (display only: blinds, chips, payouts)
-- `http://<ip>:8000/#configuracao` — system logo, chip models and color theme (applies to every tournament)
+- `http://<ip>:8000/#configuracao` — system logo, chip models, color theme and language (applies to every tournament)
 
 ## Usage flow
 
@@ -54,7 +54,7 @@ Only the **active** tournament can have its timer run — you can set up/edit ot
 - Tournament deletion in Admin (to undo a mistaken setup) — blocked only for the tournament that's currently active.
 - Sound alarm (escalating beeps) on level change and a 30s warning — only fires when the level advances on its own (time ran out), never on a manual click of the timer buttons — and plays only for whoever is looking at the clock (Timer/Manager).
 - Light/dark switch (floating icon in the top-right corner, on every screen) and tournament selection that persists across page reloads.
-- **Color theme**, selectable globally (see the section below).
+- **Color theme** and **language**, selectable globally (see the section below).
 
 ## First use
 
@@ -83,6 +83,8 @@ The **Settings** screen groups global options, which apply to every tournament (
   - **One Dark Pro / Atom One Light** — classic blue-grey
 
   Switching themes is instant across every connected screen (the same real-time mechanism used for the rest of the app).
+
+- **Language**: Portuguese (pt-BR) or English (en-US) — translates the whole interface (buttons, warnings, event history) and switches instantly across every connected screen, just like the color theme.
 
 ## Visual identity
 

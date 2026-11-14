@@ -4,8 +4,15 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+# Caminho do arquivo do banco SQLite — fica ao lado deste arquivo .py, sempre o
+# mesmo processo/pasta (usado só pela função conectar(), abaixo).
 DB_PATH = Path(__file__).parent / "torneio.db"
 
+# Estrutura de níveis (blinds) usada quando um torneio novo é criado sem passar
+# "levels" explicitamente — ver o parâmetro default de criar_torneio(). Cada
+# dicionário é um nível: sb/bb (small/big blind), ante, minutes (duração) e
+# isBreak (se é um intervalo). O nível com closesEntries=True é o que, no app,
+# passa a bloquear reentrada a partir dali.
 NIVEIS_PADRAO = [
     {"sb": 100, "bb": 200, "ante": 0, "minutes": 12, "isBreak": False},
     {"sb": 100, "bb": 300, "ante": 0, "minutes": 12, "isBreak": False},
@@ -31,6 +38,9 @@ NIVEIS_PADRAO = [
 # dados antigos — value e color são independentes dali em diante).
 COR_POR_VALOR_PADRAO = {100: "cinza", 500: "roxo", 1000: "amarelo", 5000: "azul", 25000: "rosa"}
 
+# Fichas cadastradas por padrão num torneio novo — ver parâmetro "chips" de
+# criar_torneio(). "value" é o valor em dinheiro da ficha; "model"/"color"
+# escolhem a foto exibida (static/img/fichas/{model}/{color}.png).
 CHIPS_PADRAO = [
     {"value": 100, "model": "modelo-1", "color": "cinza"},
     {"value": 500, "model": "modelo-1", "color": "roxo"},
@@ -41,14 +51,22 @@ CHIPS_PADRAO = [
 
 
 def agora_iso():
+    """Data/hora atual em UTC, no formato ISO 8601 — usado em todo timestamp
+    gravado no banco (created_at, finished_at, events.created_at etc.)."""
     return datetime.now(timezone.utc).isoformat()
 
 
 def novo_id():
+    """Gera um id aleatório (hex, sem traços) pra usar como chave primária de
+    torneios, participantes e eventos — não tem relação com o conteúdo do registro."""
     return uuid.uuid4().hex
 
 
 def conectar():
+    """Abre uma conexão nova com o banco SQLite. Cada request da API chama isso
+    uma vez (ver app.py) — não há um pool de conexões compartilhado. row_factory
+    faz as linhas virem como sqlite3.Row, que permite acessar colunas por nome
+    (ex: row["name"]) em vez de só por posição."""
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
@@ -56,6 +74,9 @@ def conectar():
 
 
 def inicializar():
+    """Chamada uma vez, na subida do servidor (app.py, evento "startup"). Cria as
+    tabelas se não existirem, roda as migrações de esquema (_migrar) e garante que
+    sempre exista um torneio "atual" — se o banco está vazio, cria o primeiro."""
     con = conectar()
     con.executescript(
         """
@@ -119,8 +140,16 @@ def inicializar():
 
 
 def _migrar(con):
-    # CREATE TABLE IF NOT EXISTS não adiciona colunas a um banco já existente,
-    # então bancos criados antes de um novo campo precisam desse ajuste manual.
+    """Ajusta o esquema de um banco que já existia antes de um campo novo ser
+    criado — CREATE TABLE IF NOT EXISTS não adiciona colunas a uma tabela que já
+    existe, só funciona pra banco novo. Cada bloco abaixo é uma migração:
+    verifica se a coluna já existe (via PRAGMA table_info) e, se não, adiciona
+    e preenche com um valor sensato a partir do que já estava salvo. Rodada
+    toda vez que o servidor sobe (inicializar), mas cada bloco só mexe em algo
+    na primeira vez — nas seguintes, a coluna já existe e o bloco é pulado."""
+    # colunas_torneios: nomes de todas as colunas da tabela tournaments hoje —
+    # usado pelos "if ... not in colunas_torneios" abaixo pra decidir se uma
+    # migração específica já rodou ou ainda precisa rodar.
     colunas_torneios = {row["name"] for row in con.execute("PRAGMA table_info(tournaments)")}
     if "configured" not in colunas_torneios:
         con.execute("ALTER TABLE tournaments ADD COLUMN configured INTEGER NOT NULL DEFAULT 0")
@@ -185,6 +214,7 @@ def _migrar(con):
         con.execute("ALTER TABLE tournaments DROP COLUMN chip_values")
         con.commit()
 
+    # Mesma lógica acima, mas pra tabela participants.
     colunas_participantes = {row["name"] for row in con.execute("PRAGMA table_info(participants)")}
     if "paid_amount" not in colunas_participantes:
         con.execute("ALTER TABLE participants ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0")
@@ -208,6 +238,14 @@ def _migrar(con):
 
 
 def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):
+    """Grava uma linha na tabela events — a linha do tempo de um torneio, exibida
+    no relatório do Admin. "tipo" é uma das strings que o app.js conhece
+    (torneio_criado, entrada, rebuy, addon, reentrada, saida, removido,
+    torneio_finalizado). "detalhe" normalmente é só o nome do participante,
+    exceto no tipo "saida", onde app.py grava um JSON (nível, blind, colocação)
+    pra o front poder traduzir e formatar na hora de exibir. Não dá commit aqui
+    de propósito — quem chama decide quando persistir (normalmente junto com
+    outras mudanças, na mesma transação)."""
     con.execute(
         "INSERT INTO events (id, tournament_id, participant_id, type, details, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (novo_id(), tournament_id, participant_id, tipo, detalhe, agora_iso()),
@@ -217,6 +255,14 @@ def registrar_evento(con, tournament_id, tipo, participant_id=None, detalhe=""):
 def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
                    addon_value=2000, action_price=20.0, dealer_share=5.0,
                    chips=None, tornar_atual=True):
+    """Cria um torneio novo (linha na tabela tournaments) e registra o evento
+    "torneio_criado". Os parâmetros com valor default (levels, entry_value...)
+    são os valores de exemplo usados quando o Admin ainda não configurou nada.
+    Se tornar_atual=True (padrão), esse torneio novo passa a ser o
+    "current_tournament_id" em settings — ou seja, o torneio que aparece no
+    Timer e pode ter o relógio controlado pelo Gerente. Retorna o id (tid) do
+    torneio criado, pra quem chamou poder usar em seguida (ex: redirecionar o
+    Admin pra tela de edição dele)."""
     tid = novo_id()
     con.execute(
         """
@@ -250,6 +296,11 @@ def criar_torneio(con, nome, levels=None, entry_value=1000, reentry_value=1000,
 
 
 def tournament_id_atual(con):
+    """Lê qual é o torneio "atual" agora (o que aparece no Timer e cujo timer o
+    Gerente controla). Guardado na tabela settings, chave "current_tournament_id"
+    — essa tabela é um key-value simples usado só pra esse tipo de configuração
+    global (não ligada a um torneio específico). Retorna None se, por algum
+    motivo, ainda não houver nenhum torneio atual definido."""
     row = con.execute(
         "SELECT value FROM settings WHERE key = 'current_tournament_id'"
     ).fetchone()
@@ -262,16 +313,49 @@ TEMAS_COR_VALIDOS = ["default", "nord", "gruvbox", "solarized", "rose-pine", "on
 
 
 def cor_tema_atual(con):
+    """Lê o tema de cor ativo (settings, chave "color_theme"). Se não houver
+    nada salvo, ou o valor salvo não estiver mais em TEMAS_COR_VALIDOS (ex:
+    um tema que foi removido do código), cai no "default" — assim o app nunca
+    fica com um valor de tema inválido/quebrado."""
     row = con.execute("SELECT value FROM settings WHERE key = 'color_theme'").fetchone()
     return row["value"] if row and row["value"] in TEMAS_COR_VALIDOS else "default"
 
 
 def definir_cor_tema(con, tema):
+    """Salva o tema de cor escolhido em settings. O "ON CONFLICT ... DO UPDATE"
+    faz um upsert: insere se a chave "color_theme" não existir ainda, ou
+    atualiza o valor se já existir — sem precisar checar antes qual dos dois
+    casos é."""
     con.execute(
         """
         INSERT INTO settings (key, value) VALUES ('color_theme', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
         """,
         (tema,),
+    )
+    con.commit()
+
+
+# Idioma da interface — também global ao sistema (igual ao tema de cor), pra
+# todo mundo conectado ver o mesmo texto independente do aparelho.
+IDIOMAS_VALIDOS = ["pt-BR", "en-US"]
+
+
+def idioma_atual(con):
+    """Mesma lógica de cor_tema_atual(), mas pro idioma da interface (settings,
+    chave "language"). Cai em "pt-BR" se não houver nada salvo ou o valor salvo
+    não for um dos IDIOMAS_VALIDOS."""
+    row = con.execute("SELECT value FROM settings WHERE key = 'language'").fetchone()
+    return row["value"] if row and row["value"] in IDIOMAS_VALIDOS else "pt-BR"
+
+
+def definir_idioma(con, idioma):
+    """Mesma lógica de definir_cor_tema(), mas pro idioma (upsert em settings)."""
+    con.execute(
+        """
+        INSERT INTO settings (key, value) VALUES ('language', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (idioma,),
     )
     con.commit()

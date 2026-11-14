@@ -21,22 +21,22 @@
         </div>
       </div>
       <div class="nav-telas">
-        <span id="selo-conexao" class="selo-conexao">conectando…</span>
+        <span id="selo-conexao" class="selo-conexao" data-i18n="conectando">conectando…</span>
       </div>
     </div>
     <div class="grade-menu">
-      <a class="cartao" href="#gerente">Gerente<span>Jogadores, timer, pagamentos e finalização</span></a>
-      <a class="cartao" href="#timer">Timer<span>Relógio para a TV/monitor</span></a>
-      <a class="cartao" href="#admin">Admin<span>Cadastro de torneios e histórico</span></a>
-      <a class="cartao" href="#configuracao">Configuração<span>Logo e modelos de ficha do sistema</span></a>
+      <a class="cartao" href="#gerente"><span data-i18n="menu_gerente_titulo">Gerente</span><span class="cartao-desc" data-i18n="menu_gerente_desc">Jogadores, timer, pagamentos e finalização</span></a>
+      <a class="cartao" href="#timer"><span data-i18n="menu_timer_titulo">Timer</span><span class="cartao-desc" data-i18n="menu_timer_desc">Relógio para a TV/monitor</span></a>
+      <a class="cartao" href="#admin"><span data-i18n="menu_admin_titulo">Admin</span><span class="cartao-desc" data-i18n="menu_admin_desc">Cadastro de torneios e histórico</span></a>
+      <a class="cartao" href="#configuracao"><span data-i18n="menu_config_titulo">Configuração</span><span class="cartao-desc" data-i18n="menu_config_desc">Logo, modelos de ficha e tema de cores do sistema</span></a>
     </div>
   </section>
 
   <!-- #gerente -->
   <section id="tela-gerente" class="tela">
     <div class="topo">
-      <h1>Gerente — <span id="gerente-nome-torneio"></span></h1>
-      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+      <h1><span data-i18n="gerente_titulo">Gerente</span> — <span id="gerente-nome-torneio"></span></h1>
+      <div class="nav-telas"><a class="botao" href="#menu" data-i18n="menu_voltar">← Menu</a></div>
     </div>
 
     <div class="admin-grade">
@@ -46,18 +46,18 @@
 
       <div class="admin-col-detalhe">
         <div class="cartao">
-          <button class="botao primario" id="gerente-botao-ativar" type="button" style="display:none; width:100%; margin-bottom:12px">Ativar este torneio</button>
+          <button class="botao primario" id="gerente-botao-ativar" type="button" style="display:none; width:100%; margin-bottom:12px" data-i18n="gerente_ativar_torneio">Ativar este torneio</button>
           <div class="totais" id="gerente-totais"></div>
-          <button class="botao" id="gerente-botao-finalizar-torneio" type="button" style="margin-top:12px">Finalizar torneio</button>
+          <button class="botao" id="gerente-botao-finalizar-torneio" type="button" style="margin-top:12px" data-i18n="gerente_finalizar_torneio">Finalizar torneio</button>
         </div>
 
         <div class="cartao">
-          <h3 style="margin-top:0" id="gerente-premio-titulo">Previsão de premiação</h3>
-          <p class="rotulo">Os 3 primeiros vêm com padrão 45% / 35% / 20% do prêmio acumulado. Cada campo é independente — edite qualquer um (inclusive pra zero). Limpe o campo pra voltar ao padrão. Adicione mais posições se pagar mais colocados.</p>
+          <h3 style="margin-top:0" id="gerente-premio-titulo" data-i18n="premiacao_titulo_previsao">Previsão de premiação</h3>
+          <p class="rotulo" data-i18n="premiacao_instrucoes">Os 3 primeiros vêm com padrão 45% / 35% / 20% do prêmio acumulado. Cada campo é independente — edite qualquer um (inclusive pra zero). Limpe o campo pra voltar ao padrão. Adicione mais posições se pagar mais colocados.</p>
           <div class="form-grade" id="gerente-premio-lista"></div>
-          <button class="botao" id="gerente-botao-add-premiado" type="button" style="margin-top:12px">+ Adicionar premiado</button>
+          <button class="botao" id="gerente-botao-add-premiado" type="button" style="margin-top:12px" data-i18n="premiacao_adicionar">+ Adicionar premiado</button>
           <p class="rotulo" id="gerente-premio-total" style="margin-top:8px"></p>
-          <button class="botao primario" id="gerente-botao-confirmar-premiacao" type="button" style="margin-top:8px">Confirmar divisão de premiação</button>
+          <button class="botao primario" id="gerente-botao-confirmar-premiacao" type="button" style="margin-top:8px" data-i18n="premiacao_confirmar">Confirmar divisão de premiação</button>
         </div>
 
         <div class="cartao">
@@ -65,24 +65,33 @@
           <div class="timer-blinds" id="gerente-blinds" style="font-size:1.8rem">—</div>
           <div class="timer-relogio" id="gerente-relogio" style="font-size:clamp(3rem,10vw,6rem)">00:00</div>
           <div class="controles-timer">
-            <button class="botao" id="gerente-botao-prev" type="button">⏮ Anterior</button>
-            <button class="botao primario" id="gerente-botao-playpause" type="button">▶ Tocar</button>
-            <button class="botao" id="gerente-botao-next" type="button">Próximo ⏭</button>
-            <button class="botao" id="gerente-botao-menos1" type="button">-1 min</button>
-            <button class="botao" id="gerente-botao-mais1" type="button">+1 min</button>
-            <button class="botao perigo" id="gerente-botao-reiniciar" type="button">⟲ Reiniciar</button>
-            <button class="botao" id="gerente-botao-mudo" type="button">🔈 Som</button>
+            <button class="botao" id="gerente-botao-prev" type="button" data-i18n="timer_anterior">⏮ Anterior</button>
+            <button class="botao primario" id="gerente-botao-playpause" type="button" data-i18n="timer_tocar">▶ Tocar</button>
+            <button class="botao" id="gerente-botao-next" type="button" data-i18n="timer_proximo">Próximo ⏭</button>
+            <button class="botao" id="gerente-botao-menos1" type="button" data-i18n="timer_menos1">-1 min</button>
+            <button class="botao" id="gerente-botao-mais1" type="button" data-i18n="timer_mais1">+1 min</button>
+            <button class="botao perigo" id="gerente-botao-reiniciar" type="button" data-i18n="timer_reiniciar">⟲ Reiniciar</button>
+            <button class="botao" id="gerente-botao-mudo" type="button" data-i18n="timer_som">🔈 Som</button>
           </div>
         </div>
 
         <div class="cartao cartao-jogadores">
           <form class="form-inline" id="form-novo-participante">
-            <input type="text" id="input-novo-participante" placeholder="Nome do jogador" required>
-            <button class="botao primario" type="submit">Adicionar</button>
+            <input type="text" id="input-novo-participante" placeholder="Nome do jogador" data-i18n-placeholder="gerente_nome_jogador_placeholder" required>
+            <button class="botao primario" type="submit" data-i18n="gerente_adicionar">Adicionar</button>
           </form>
           <table class="lista">
             <thead>
-              <tr><th>Jogador</th><th>Rebuys</th><th>Add-on</th><th>Valor devido</th><th>Valor pago</th><th>Pagamento</th><th>Status</th><th>Ações</th></tr>
+              <tr>
+                <th data-i18n="coluna_jogador">Jogador</th>
+                <th data-i18n="coluna_rebuys">Rebuys</th>
+                <th data-i18n="coluna_addon">Add-on</th>
+                <th data-i18n="coluna_valor_devido">Valor devido</th>
+                <th data-i18n="coluna_valor_pago">Valor pago</th>
+                <th data-i18n="coluna_pagamento">Pagamento</th>
+                <th data-i18n="coluna_status">Status</th>
+                <th data-i18n="coluna_acoes">Ações</th>
+              </tr>
             </thead>
             <tbody id="gerente-lista-jogadores"></tbody>
           </table>
@@ -95,7 +104,7 @@
   <section id="tela-timer" class="tela">
     <div class="topo">
       <h1 id="timer-nome-torneio"></h1>
-      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+      <div class="nav-telas"><a class="botao" href="#menu" data-i18n="menu_voltar">← Menu</a></div>
     </div>
 
     <div class="timer-grade">
@@ -108,12 +117,12 @@
         <p class="timer-prox" id="timer-proximo-nivel"></p>
 
         <div class="timer-stats">
-          <div><div class="valor" id="timer-prize-pool">R$ 0</div><div class="rotulo">Prêmio acumulado</div></div>
-          <div><div class="valor" id="timer-jogadores-ativos">0</div><div class="rotulo">Jogadores ativos</div></div>
-          <div><div class="valor" id="timer-stack-medio">0</div><div class="rotulo">Stack médio</div></div>
+          <div><div class="valor" id="timer-prize-pool">R$ 0</div><div class="rotulo" data-i18n="timer_prize_pool">Prêmio acumulado</div></div>
+          <div><div class="valor" id="timer-jogadores-ativos">0</div><div class="rotulo" data-i18n="timer_jogadores_ativos">Jogadores ativos</div></div>
+          <div><div class="valor" id="timer-stack-medio">0</div><div class="rotulo" data-i18n="timer_stack_medio">Stack médio</div></div>
         </div>
 
-        <p class="timer-prox" id="timer-premio-titulo" style="margin-top:20px">Previsão de premiação</p>
+        <p class="timer-prox" id="timer-premio-titulo" style="margin-top:20px" data-i18n="premiacao_titulo_previsao">Previsão de premiação</p>
         <div class="timer-stats" id="timer-premio-lista"></div>
       </div>
     </div>
@@ -122,19 +131,19 @@
   <!-- #admin -->
   <section id="tela-admin" class="tela">
     <div class="topo">
-      <h1>Admin</h1>
-      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+      <h1 data-i18n="admin_titulo">Admin</h1>
+      <div class="nav-telas"><a class="botao" href="#menu" data-i18n="menu_voltar">← Menu</a></div>
     </div>
 
     <div class="admin-grade">
       <div class="cartao admin-col-lista">
-        <button class="botao primario" id="admin-botao-novo-torneio" type="button" style="width:100%; margin-bottom:12px">+ Novo torneio</button>
+        <button class="botao primario" id="admin-botao-novo-torneio" type="button" style="width:100%; margin-bottom:12px" data-i18n="admin_novo_torneio">+ Novo torneio</button>
         <div id="admin-lista-torneios"></div>
       </div>
 
       <div class="cartao admin-col-detalhe">
         <div id="admin-detalhe-vazio">
-          <p class="rotulo">Selecione um torneio à esquerda, ou crie um novo para começar o cadastro.</p>
+          <p class="rotulo" data-i18n="admin_selecione_torneio">Selecione um torneio à esquerda, ou crie um novo para começar o cadastro.</p>
         </div>
 
         <div id="admin-detalhe-editar" style="display:none">
@@ -143,28 +152,39 @@
             <span class="selo-conexao" id="admin-selo-configurado">não salvo</span>
           </div>
           <form class="form-grade" id="form-admin-geral">
-            <label class="campo">Nome do torneio<input type="text" id="admin-input-nome"></label>
-            <label class="campo">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
-            <label class="campo">Fichas do rebuy<input type="text" inputmode="text" id="admin-input-reentry" placeholder="ex: 2k"></label>
-            <label class="campo">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
-            <label class="campo">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
-            <label class="campo">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
+            <label class="campo" data-i18n="admin_nome_torneio">Nome do torneio<input type="text" id="admin-input-nome"></label>
+            <label class="campo" data-i18n="admin_fichas_buyin">Fichas do buy-in<input type="text" inputmode="text" id="admin-input-entry" placeholder="ex: 2k"></label>
+            <label class="campo" data-i18n="admin_fichas_rebuy">Fichas do rebuy<input type="text" inputmode="text" id="admin-input-reentry" placeholder="ex: 2k"></label>
+            <label class="campo" data-i18n="admin_fichas_addon">Fichas do add-on<input type="text" inputmode="text" id="admin-input-addon" placeholder="ex: 2k"></label>
+            <label class="campo" data-i18n="admin_preco_acao">Preço por ação (R$)<input type="text" inputmode="text" id="admin-input-preco" placeholder="ex: 20"></label>
+            <label class="campo" data-i18n="admin_parte_dealer">Parte do dealer por ação (R$)<input type="text" inputmode="text" id="admin-input-dealer" placeholder="ex: 5"></label>
           </form>
-          <button class="botao primario" id="admin-botao-salvar" type="button">Salvar</button>
+          <button class="botao primario" id="admin-botao-salvar" type="button" data-i18n="admin_salvar">Salvar</button>
 
-          <h3 style="margin-top:20px">Fichas cadastradas</h3>
-          <p class="rotulo">Valor e modelo visual de cada ficha física que você tem em casa — define o que aparece na coluna de fichas da tela Timer.</p>
+          <h3 style="margin-top:20px" data-i18n="admin_fichas_cadastradas_titulo">Fichas cadastradas</h3>
+          <p class="rotulo" data-i18n="admin_fichas_cadastradas_desc">Valor e modelo visual de cada ficha física que você tem em casa — define o que aparece na coluna de fichas da tela Timer.</p>
           <div id="admin-lista-fichas"></div>
-          <button class="botao" id="admin-botao-add-ficha" type="button">+ Adicionar ficha</button>
+          <button class="botao" id="admin-botao-add-ficha" type="button" data-i18n="admin_adicionar_ficha">+ Adicionar ficha</button>
 
-          <h3 style="margin-top:20px">Estrutura de níveis</h3>
+          <h3 style="margin-top:20px" data-i18n="admin_estrutura_niveis">Estrutura de níveis</h3>
           <table class="lista niveis">
-            <thead><tr><th>#</th><th>SB</th><th>BB</th><th>Ante</th><th>Tempo</th><th>Pausa</th><th>Fecha entradas</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th data-i18n="coluna_nivel_num">#</th>
+                <th data-i18n="coluna_sb">SB</th>
+                <th data-i18n="coluna_bb">BB</th>
+                <th data-i18n="coluna_ante">Ante</th>
+                <th data-i18n="coluna_tempo">Tempo</th>
+                <th data-i18n="coluna_pausa">Pausa</th>
+                <th data-i18n="coluna_fecha_entradas">Fecha entradas</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="admin-lista-niveis"></tbody>
           </table>
-          <button class="botao" id="admin-botao-add-nivel" type="button">+ Adicionar nível</button>
+          <button class="botao" id="admin-botao-add-nivel" type="button" data-i18n="admin_adicionar_nivel">+ Adicionar nível</button>
 
-          <button class="botao perigo" id="admin-botao-excluir-torneio" type="button" style="margin-top:24px">Excluir torneio</button>
+          <button class="botao perigo" id="admin-botao-excluir-torneio" type="button" style="margin-top:24px" data-i18n="admin_excluir_torneio">Excluir torneio</button>
         </div>
 
         <div id="admin-detalhe-relatorio" style="display:none"></div>
@@ -175,13 +195,13 @@
   <!-- #configuracao -->
   <section id="tela-configuracao" class="tela">
     <div class="topo">
-      <h1>Configuração</h1>
-      <div class="nav-telas"><a class="botao" href="#menu">← Menu</a></div>
+      <h1 data-i18n="config_titulo">Configuração</h1>
+      <div class="nav-telas"><a class="botao" href="#menu" data-i18n="menu_voltar">← Menu</a></div>
     </div>
 
     <div class="cartao">
-      <h3 style="margin-top:0">Tema de cores</h3>
-      <p class="rotulo">
+      <h3 style="margin-top:0" data-i18n="config_tema_titulo">Tema de cores</h3>
+      <p class="rotulo" data-i18n="config_tema_desc">
         Esquema de cores do sistema inteiro (separado do interruptor claro/escuro).
         "Padrão" é o roxo/índigo original — todos os temas têm variante clara e escura,
         e continuam respeitando o interruptor de cada tela.
@@ -190,20 +210,26 @@
     </div>
 
     <div class="cartao" style="margin-top:16px">
-      <h3 style="margin-top:0">Logo do sistema</h3>
-      <p class="rotulo">
+      <h3 style="margin-top:0" data-i18n="config_idioma_titulo">Idioma</h3>
+      <p class="rotulo" data-i18n="config_idioma_desc">Idioma da interface, pra todo mundo conectado.</p>
+      <div id="config-lista-idiomas"></div>
+    </div>
+
+    <div class="cartao" style="margin-top:16px">
+      <h3 style="margin-top:0" data-i18n="config_logo_titulo">Logo do sistema</h3>
+      <p class="rotulo" data-i18n="config_logo_desc">
         Usada no menu e como marca d'água de fundo em todas as telas. Envie um PNG com fundo
         transparente, de preferência quadrado (ex: 512×512px), com a arte bem enquadrada e sem
         muita margem em branco ao redor — senão a marca d'água fica pequena ou apagada.
       </p>
-      <img id="config-logo-atual" src="img/lk-logo.png" alt="Logo atual">
+      <img id="config-logo-atual" src="img/lk-logo.png" alt="Logo atual" data-i18n-alt="config_logo_alt">
       <input type="file" id="config-input-logo" accept="image/*">
-      <button class="botao primario" id="config-botao-enviar-logo" type="button" style="margin-top:8px">Enviar logo</button>
+      <button class="botao primario" id="config-botao-enviar-logo" type="button" style="margin-top:8px" data-i18n="config_enviar_logo">Enviar logo</button>
     </div>
 
     <div class="cartao" style="margin-top:16px">
-      <h3 style="margin-top:0">Modelos de ficha</h3>
-      <p class="rotulo">
+      <h3 style="margin-top:0" data-i18n="config_modelos_titulo">Modelos de ficha</h3>
+      <p class="rotulo" data-i18n-html="config_modelos_desc">
         Cada modelo tem o nome e as cores que você quiser — dê um nome ao modelo, depois um
         nome e uma foto pra cada cor. <strong>Cada foto deve conter uma única ficha</strong> — a
         tela já recorta em círculo na exibição, então não precisa recortar antes, mas se a foto
@@ -213,25 +239,25 @@
       </p>
       <div id="config-lista-modelos"></div>
 
-      <h3 style="margin-top:20px">Adicionar modelo</h3>
-      <label class="campo campo-largo">Nome do modelo<input type="text" id="config-modelo-nome" placeholder="ex: LKpoker"></label>
+      <h3 style="margin-top:20px" data-i18n="config_adicionar_modelo_titulo">Adicionar modelo</h3>
+      <label class="campo campo-largo" data-i18n="config_nome_modelo">Nome do modelo<input type="text" id="config-modelo-nome" placeholder="ex: LKpoker"></label>
       <div id="config-cores-lista" style="margin-top:12px"></div>
-      <button class="botao" id="config-botao-add-cor" type="button" style="margin-top:8px">+ Adicionar cor</button>
-      <button class="botao primario" id="config-botao-add-modelo" type="button" style="margin-top:12px; display:block">Salvar novo modelo</button>
+      <button class="botao" id="config-botao-add-cor" type="button" style="margin-top:8px" data-i18n="config_adicionar_cor">+ Adicionar cor</button>
+      <button class="botao primario" id="config-botao-add-modelo" type="button" style="margin-top:12px; display:block" data-i18n="config_salvar_novo_modelo">Salvar novo modelo</button>
     </div>
   </section>
 
   <!-- #offline -->
   <section id="tela-offline" class="tela">
     <div class="aviso-offline">
-      <h1>Sem conexão com o servidor</h1>
-      <p>Verifique se o servidor do torneio está rodando na rede local. Tentando reconectar automaticamente…</p>
+      <h1 data-i18n="offline_titulo">Sem conexão com o servidor</h1>
+      <p data-i18n="offline_desc">Verifique se o servidor do torneio está rodando na rede local. Tentando reconectar automaticamente…</p>
     </div>
   </section>
 
   <div class="toast" id="toast"></div>
 
-  <button class="interruptor-tema" id="botao-tema" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro">
+  <button class="interruptor-tema" id="botao-tema" type="button" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro" data-i18n-title="interruptor_tema_titulo" data-i18n-aria-label="interruptor_tema_titulo">
     <svg class="interruptor-tema-icone interruptor-tema-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="4"></circle>
       <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
@@ -242,6 +268,7 @@
     <span class="interruptor-tema-bolinha"></span>
   </button>
 
+  <script src="i18n.js"></script>
   <script src="audio.js"></script>
   <script src="api.js"></script>
   <script src="timer.js"></script>

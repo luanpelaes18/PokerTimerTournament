@@ -1,7 +1,15 @@
+// audio.js gera o bipe do alarme por código (onda quadrada via Web Audio API),
+// sem precisar de nenhum arquivo de som — e também cuida de vibrar o aparelho
+// (em celulares) e de "destravar" o áudio, já que navegadores modernos não
+// deixam tocar som nenhum antes do usuário interagir com a página.
 (function () {
-  var ctx = null;
+  var ctx = null; // o AudioContext é criado uma vez só e reaproveitado (ver obterContexto)
 
   function obterContexto() {
+    // Cria o AudioContext na primeira chamada e devolve o mesmo depois disso
+    // (variável "ctx" acima). Devolve null se o navegador não suportar Web
+    // Audio API ou se a criação falhar por algum motivo — quem chama
+    // (tocarTom, destravar) já trata esse caso sem quebrar o resto do app.
     if (!ctx) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) {
@@ -19,6 +27,11 @@
   }
 
   function tocarTom(freq, inicioSeg, duracaoSeg) {
+    // Toca um bipe simples: um oscilador de onda quadrada (osc, no volume
+    // definido por "gain") na frequência "freq" (Hz), começando "inicioSeg"
+    // segundos a partir de agora e durando "duracaoSeg" segundos. Cada
+    // chamada cria um oscilador novo e descartável — não dá pra reusar um
+    // depois de parado.
     var audioCtx = obterContexto();
     if (!audioCtx) return;
     var osc = audioCtx.createOscillator();
@@ -57,5 +70,7 @@
     if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
   }
 
+  // Exposto globalmente pra timer.js (toca o alarme) e app.js (destrava no
+  // primeiro clique da página) chamarem.
   window.Audio30 = { bipar: bipar, alertaCurto: alertaCurto, destravar: destravar };
 })();

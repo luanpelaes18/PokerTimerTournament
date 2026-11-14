@@ -4,7 +4,7 @@
 
 Sistema de controle de torneios de poker para home games: cadastro de torneio (fichas, valores, estrutura de blinds, premiação), gerenciamento de jogadores (rebuy, add-on, reentrada, pagamentos) e um relógio de torneio sincronizado em tempo real entre vários dispositivos na mesma rede — ideal pra deixar um celular com o controle e um monitor/TV só com o relógio pros jogadores.
 
-Quatro telas: **Admin** (cadastro de torneios e histórico), **Gerente** (jogadores, timer e finalização), **Timer** (relógio para a TV/monitor) e **Configuração** (logo, modelos de ficha e tema de cores — tudo global, vale pra qualquer torneio).
+Quatro telas: **Admin** (cadastro de torneios e histórico), **Gerente** (jogadores, timer e finalização), **Timer** (relógio para a TV/monitor) e **Configuração** (logo, modelos de ficha, tema de cores e idioma — tudo global, vale pra qualquer torneio).
 
 Stack: Python (FastAPI + WebSocket) + SQLite, frontend em HTML/CSS/JS puro servido pelo próprio backend. Sem nuvem, sem conta externa — roda local na sua rede durante a partida.
 
@@ -30,7 +30,7 @@ E acesse `http://<esse-ip>:8000` nos outros dispositivos. Rotas diretas:
 - `http://<ip>:8000/#admin` — cadastrar torneios (nome, valores, fichas, premiação, estrutura de níveis), ver o histórico dos anteriores e excluir torneios criados por engano
 - `http://<ip>:8000/#gerente` — escolher/ativar o torneio, cadastrar jogadores, rebuy/add-on/reentrada/pagamento, controlar o timer e finalizar
 - `http://<ip>:8000/#timer` — relógio grande para a TV/monitor (só exibição: blinds, fichas, premiação)
-- `http://<ip>:8000/#configuracao` — logo do sistema, modelos de ficha e tema de cores (vale pra todos os torneios)
+- `http://<ip>:8000/#configuracao` — logo do sistema, modelos de ficha, tema de cores e idioma (vale pra todos os torneios)
 
 ## Fluxo de uso
 
@@ -54,7 +54,7 @@ Só o torneio **ativo** pode ter o timer tocado — dá pra cadastrar/editar out
 - Exclusão de torneios no Admin (pra desfazer cadastro feito por engano) — bloqueada apenas para o torneio atualmente ativo.
 - Alarme sonoro (bipes crescentes) na troca de nível e aviso 30s antes — só dispara quando o nível avança sozinho (tempo esgotado), nunca em clique manual nos botões do timer — e toca apenas em quem está olhando o relógio (Timer/Gerente).
 - Interruptor claro/escuro (ícone flutuante no canto superior direito, em todas as telas) e seleção de torneio persistente entre recargas da página.
-- **Tema de cores** selecionável globalmente (ver seção abaixo).
+- **Tema de cores** e **idioma** selecionáveis globalmente (ver seção abaixo).
 
 ## Primeiro uso
 
@@ -83,6 +83,8 @@ A tela **Configuração** reúne ajustes globais, que valem pra qualquer torneio
   - **One Dark Pro / Atom One Light** — azul-acinzentado clássico
 
   A troca de tema é instantânea em todas as telas conectadas (mesmo mecanismo de tempo real usado pro resto do app).
+
+- **Idioma**: português (pt-BR) ou inglês (en-US) — traduz toda a interface (botões, avisos, histórico de eventos) e troca de forma instantânea em todas as telas conectadas, assim como o tema de cores.
 
 ## Identidade visual
 
